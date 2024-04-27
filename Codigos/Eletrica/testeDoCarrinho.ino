@@ -1,3 +1,5 @@
+// ainda falta colocar mais alguns detalhes sobre a ponte H mas forma geral é isso
+
 #include <Servo.h>
 
 Servo valorServo;
