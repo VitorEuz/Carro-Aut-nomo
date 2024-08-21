@@ -1,0 +1,135 @@
+import cv2
+import numpy as np
+
+# Captura de vídeo em tempo real através da webcam
+vidcap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+# Verificação se a captura de vídeo foi iniciada com sucesso
+if not vidcap.isOpened():
+    print("Erro: Não foi possível acessar a webcam.")
+    exit()
+
+def nothing(x):
+    pass
+
+cv2.namedWindow("Trackbars")
+
+# Definindo os Trackbars para ajuste manual
+cv2.createTrackbar("L - H", "Trackbars", 0, 255, nothing)
+cv2.createTrackbar("L - S", "Trackbars", 0, 255, nothing)
+cv2.createTrackbar("L - V", "Trackbars", 200, 255, nothing)
+cv2.createTrackbar("U - H", "Trackbars", 255, 255, nothing)
+cv2.createTrackbar("U - S", "Trackbars", 50, 255, nothing)
+cv2.createTrackbar("U - V", "Trackbars", 255, 255, nothing)
+cv2.createTrackbar("Saturation", "Trackbars", 100, 300, nothing)  # Novo Trackbar para Saturação
+
+while True:
+    success, image = vidcap.read()
+    if not success:
+        print("Erro: Não foi possível capturar a imagem da webcam.")
+        break
+
+    frame = cv2.resize(image, (640, 480))
+
+    # Aplicando filtro de saturação à imagem original
+    saturation_scale = cv2.getTrackbarPos("Saturation", "Trackbars") / 100.0
+    hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    hsv_frame[..., 1] = cv2.multiply(hsv_frame[..., 1], saturation_scale)  # Ajusta a saturação
+    saturated_frame = cv2.cvtColor(hsv_frame, cv2.COLOR_HSV2BGR)
+
+    # Escolhendo pontos para a transformação de perspectiva
+    tl = (180, 387)
+    bl = (80, 472)
+    tr = (470, 380)
+    br = (600, 472)
+
+    cv2.circle(saturated_frame, tl, 5, (0, 0, 255), -1)
+    cv2.circle(saturated_frame, bl, 5, (0, 0, 255), -1)
+    cv2.circle(saturated_frame, tr, 5, (0, 0, 255), -1)
+    cv2.circle(saturated_frame, br, 5, (0, 0, 255), -1)
+
+    # Aplicando transformação de perspectiva
+    pts1 = np.float32([tl, bl, tr, br])
+    pts2 = np.float32([[0, 0], [0, 480], [640, 0], [640, 480]])
+    matrix = cv2.getPerspectiveTransform(pts1, pts2)
+    transformed_frame = cv2.warpPerspective(saturated_frame, matrix, (640, 480))
+
+    # Pré-processamento com filtro gaussiano
+    blurred_frame = cv2.GaussianBlur(transformed_frame, (5, 5), 0)
+
+    # Detecção de objetos
+    hsv_transformed_frame = cv2.cvtColor(blurred_frame, cv2.COLOR_BGR2HSV)
+
+    l_h = cv2.getTrackbarPos("L - H", "Trackbars")
+    l_s = cv2.getTrackbarPos("L - S", "Trackbars")
+    l_v = cv2.getTrackbarPos("L - V", "Trackbars")
+    u_h = cv2.getTrackbarPos("U - H", "Trackbars")
+    u_s = cv2.getTrackbarPos("U - S", "Trackbars")
+    u_v = cv2.getTrackbarPos("U - V", "Trackbars")
+
+    lower = np.array([l_h, l_s, l_v])
+    upper = np.array([u_h, u_s, u_v])
+    mask = cv2.inRange(hsv_transformed_frame, lower, upper)
+
+    # Região de Interesse (ROI)
+    mask_roi = mask[200:]  # Usando apenas a parte inferior da imagem
+
+    # Histograma
+    histogram = np.sum(mask_roi[mask_roi.shape[0] // 2:, :], axis=0)
+    midpoint = int(histogram.shape[0] / 2)
+    left_base = np.argmax(histogram[:midpoint])
+    right_base = np.argmax(histogram[midpoint:]) + midpoint
+
+    # Sliding Window
+    y = 472
+    lx = []
+    rx = []
+
+    msk = mask.copy()
+    midpoints = []  # Lista para armazenar os pontos médios
+
+    while y > 0:
+        # Limite esquerdo
+        img = mask[y - 40:y, left_base - 50:left_base + 50]
+        contours, _ = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        for contour in contours:
+            M = cv2.moments(contour)
+            if M["m00"] != 0:
+                cx = int(M["m10"] / M["m00"])
+                lx.append(left_base - 50 + cx)
+                left_base = left_base - 50 + cx
+
+        # Limite direito
+        img = mask[y - 40:y, right_base - 50:right_base + 50]
+        contours, _ = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        for contour in contours:
+            M = cv2.moments(contour)
+            if M["m00"] != 0:
+                cx = int(M["m10"] / M["m00"])
+                rx.append(right_base - 50 + cx)
+                right_base = right_base - 50 + cx
+
+        if lx and rx:
+            midpoint_x = (lx[-1] + rx[-1]) // 2
+            midpoints.append((midpoint_x, y))
+
+        cv2.rectangle(msk, (left_base - 50, y), (left_base + 50, y - 40), (255, 255, 255), 2)
+        cv2.rectangle(msk, (right_base - 50, y), (right_base + 50, y - 40), (255, 255, 255), 2)
+        y -= 40
+
+    # Desenhando a linha vermelha entre as faixas
+    if len(midpoints) > 1:
+        for i in range(len(midpoints) - 1):
+            cv2.line(msk, midpoints[i], midpoints[i + 1], (0, 0, 255), 2)  # Linha vermelha
+
+    cv2.imshow("Original", saturated_frame)
+    cv2.imshow("Bird's Eye View", transformed_frame)
+    cv2.imshow("Lane Detection - Image Thresholding", mask)
+    cv2.imshow("Lane Detection - Sliding Windows", msk)
+
+    if cv2.waitKey(10) == 20:
+        break
+
+# Libera a câmera e fecha as janelas abertas
+vidcap.release()
+cv2.destroyAllWindows()
