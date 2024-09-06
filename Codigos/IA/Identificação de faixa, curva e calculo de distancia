@@ -1,0 +1,156 @@
+import cv2
+import numpy as np
+import time
+
+
+def nothing(x):
+    pass
+
+
+def detectar_faixas_por_contornos(frame, canny_min, canny_max, thresh_low, thresh_high):
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # Aplicar threshold para obter imagem binária
+    _, thresh = cv2.threshold(gray, thresh_low, thresh_high, cv2.THRESH_BINARY)
+
+    # Suavizar a imagem antes de aplicar o Canny
+    blurred = cv2.GaussianBlur(thresh, (5, 5), 0)
+
+    # Detectar bordas com Canny
+    edges = cv2.Canny(blurred, canny_min, canny_max)
+
+    # Encontrar contornos
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    return contours, edges
+
+
+def calcular_distancia_com_angulo(roi, ponto_central, contours):
+    altura, largura = roi.shape[:2]
+    ponto_vermelho = (int(largura / 2), int(altura / 2))
+
+    menor_distancia = float('inf')
+    ponto_mais_proximo = None
+    angulo_encontrado = 0
+
+    # Definir o intervalo de ângulos
+    angulo_min = -15
+    angulo_max = 15
+    angulo_incremento = 1
+
+    if contours is not None:
+        for angulo in range(angulo_min, angulo_max + angulo_incremento, angulo_incremento):
+            rad = np.deg2rad(angulo)
+            cos_a = np.cos(rad)
+            sin_a = np.sin(rad)
+            for contour in contours:
+                for i in range(len(contour) - 1):
+                    x1, y1 = contour[i][0]
+                    x2, y2 = contour[i + 1][0]
+                    if x1 > ponto_central[0] and x2 > ponto_central[0]:  # Faixa à esquerda if x1 < ponto_central[0] and x2 < ponto_central[0]:
+                        x1_rot = cos_a * (x1 - ponto_vermelho[0]) - sin_a * (y1 - ponto_vermelho[1]) + ponto_vermelho[0]
+                        y1_rot = sin_a * (x1 - ponto_vermelho[0]) + cos_a * (y1 - ponto_vermelho[1]) + ponto_vermelho[1]
+                        x2_rot = cos_a * (x2 - ponto_vermelho[0]) - sin_a * (y2 - ponto_vermelho[1]) + ponto_vermelho[0]
+                        y2_rot = sin_a * (x2 - ponto_vermelho[0]) + cos_a * (y2 - ponto_vermelho[1]) + ponto_vermelho[1]
+
+                        distancia = np.abs((y2_rot - y1_rot) * ponto_vermelho[0] - (x2_rot - x1_rot) * ponto_vermelho[
+                            1] + x2_rot * y1_rot - y2_rot * x1_rot) / np.sqrt(
+                            (y2_rot - y1_rot) ** 2 + (x2_rot - x1_rot) ** 2)
+                        if distancia < menor_distancia:
+                            menor_distancia = distancia
+                            ponto_mais_proximo = (int(x1), int(y1))
+                            angulo_encontrado = angulo
+
+    return menor_distancia if menor_distancia != float('inf') else 0, ponto_mais_proximo, angulo_encontrado
+
+
+def definir_roi(frame, roi_height):
+    altura, largura = frame.shape[:2]
+    roi = frame[int(altura * (1 - roi_height)):altura, :]
+    return roi
+
+
+cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+
+cv2.namedWindow('Filtros')
+cv2.createTrackbar('Canny Low', 'Filtros', 50, 255, nothing)
+cv2.createTrackbar('Canny High', 'Filtros', 150, 255, nothing)
+cv2.createTrackbar('Threshold Low', 'Filtros', 210, 255, nothing)
+cv2.createTrackbar('Threshold High', 'Filtros', 255, 255, nothing)
+cv2.createTrackbar('ROI Height', 'Filtros', 3, 10, nothing)
+
+distancia_desejada = 50  # Distância de pixels entre o ponto vermelho e a faixa escolhida
+
+frame_count = 0
+distancias = []
+tempo_inicio = time.time()
+
+while True:
+    ret, frame = cap.read()
+    if not ret or frame is None:
+        print("Erro ao capturar o frame")
+        break
+
+    canny_min = cv2.getTrackbarPos('Canny Low', 'Filtros')
+    canny_max = cv2.getTrackbarPos('Canny High', 'Filtros')
+    thresh_low = cv2.getTrackbarPos('Threshold Low', 'Filtros')
+    thresh_high = cv2.getTrackbarPos('Threshold High', 'Filtros')
+    roi_height = cv2.getTrackbarPos('ROI Height', 'Filtros') / 10.0
+
+    roi = definir_roi(frame, roi_height)
+
+    contours, edges = detectar_faixas_por_contornos(roi, canny_min, canny_max, thresh_low, thresh_high)
+
+    # Desenhar contornos detectados
+    if contours is not None:
+        cv2.drawContours(roi, contours, -1, (0, 255, 0), 2)
+
+        # Calcula o ponto central baseado no ROI, não na imagem completa
+        ponto_central = (roi.shape[1] // 2, roi.shape[0] // 2)
+        distancia, ponto_mais_proximo, angulo_encontrado = calcular_distancia_com_angulo(roi, ponto_central, contours)
+        distancias.append(distancia)
+
+        frame_count += 1
+
+        # Captura a cada 5 frames por segundo
+        if frame_count == 5:
+            frame_count = 0
+
+            # Calcular a média das distâncias a cada 2 segundos
+            if time.time() - tempo_inicio >= 1.5:
+                media_distancia = np.mean(distancias)
+                diferenca_distancia = media_distancia - distancia_desejada
+
+                # Exibir as informações
+                distancia_img = np.zeros_like(roi)
+                cv2.putText(distancia_img, f'Distancia Media: {int(media_distancia)} pixels', (50, 50),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+                cv2.imshow("Distancia", distancia_img)
+
+                diferenca_img = np.zeros_like(roi)
+                cv2.putText(diferenca_img, f'Diferenca Media: {int(diferenca_distancia)} pixels', (50, 50),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+                cv2.imshow("Diferenca de Distancia", diferenca_img)
+
+                # Resetar o tempo e a lista de distâncias
+                tempo_inicio = time.time()
+                distancias.clear()
+
+        # Ponto central vermelho no ROI
+        cv2.circle(roi, ponto_central, 5, (0, 0, 255), -1)
+
+        # Desenhar a linha até a faixa mais próxima dentro do ângulo permitido
+        if ponto_mais_proximo is not None:
+            # A linha agora vai do ponto central até o ponto mais próximo identificado
+            cv2.line(roi, ponto_central, ponto_mais_proximo, (255, 0, 0), 2)
+            cv2.circle(roi, ponto_mais_proximo, 5, (255, 0, 0), -1)
+
+    cv2.imshow("Frame", frame)
+    cv2.imshow("ROI", roi)
+    cv2.imshow("Edges", edges)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
