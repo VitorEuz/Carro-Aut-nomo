@@ -76,11 +76,11 @@ cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 cv2.namedWindow('Filtros')
 cv2.createTrackbar('Canny Low', 'Filtros', 50, 255, nothing)
 cv2.createTrackbar('Canny High', 'Filtros', 150, 255, nothing)
-cv2.createTrackbar('Threshold Low', 'Filtros', 240, 255, nothing)
+cv2.createTrackbar('Threshold Low', 'Filtros', 250, 255, nothing)
 cv2.createTrackbar('Threshold High', 'Filtros', 255, 255, nothing)
-cv2.createTrackbar('ROI Height', 'Filtros', 3, 10, nothing)
+cv2.createTrackbar('ROI Height', 'Filtros', 4, 10, nothing)
 
-distancia_desejada = 10  # AQUI Distância de pixels entre o ponto vermelho e a faixa escolhida
+distancia_desejada = 80  # AQUI Distância de pixels entre o ponto vermelho e a faixa escolhida
 
 frame_count = 0
 distancias = []
@@ -133,10 +133,12 @@ while True:
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
 
                 # AQUI imprime "aproximar da faixa" ou "afastar da faixa" com base na diferença
-                if distancia < 40:
+                if diferenca_distancia < 20:
                     print("afastar da faixa")
-                elif distancia > 50:
+                elif diferenca_distancia > 0:
                     print("Aproximar da faixa")
+                elif 0 < diferenca_distancia < 20:
+                    print("manter curso")
 
                 cv2.imshow("Diferenca de Distancia", diferenca_img)
 
