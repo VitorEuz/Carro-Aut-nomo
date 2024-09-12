@@ -5,7 +5,7 @@ import time
 pid = PID(0.0, 0.0, 0.0, setpoint=0)  # Setpoint é zero, pois queremos que o erro seja zero
 
 # Limita o valor de saída do PID para corresponder ao ângulo do servo
-pid.output_limits = (20, 120)  # Limita o valor do controle do servo
+pid.output_limits = (-90, 90)  # Limita o valor do controle do servo
 
 
 # Loop de controle contínuo
