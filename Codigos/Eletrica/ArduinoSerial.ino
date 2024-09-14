@@ -1,12 +1,3 @@
-/*
-Array[0] = SERVO
-Array[1] = Velocidade
-
-
-*/
-
-
-
 #include <Servo.h>
 
 Servo servo_direcao;
@@ -18,9 +9,11 @@ const byte MOTOR_1B = 19;
 const byte MOTOR_2A = 16;
 const byte MOTOR_2B = 17;
 
-
 const byte LED_PIN = 13;       // Pino do LED integrado
 const byte SERVO_PIN = 12; // Pino para o controle do servo motor
+
+// Declaração do array global
+String enviarArray[9]; // 8 posições para valores enviados
 
 void setup()
 {
@@ -58,22 +51,23 @@ void loop() {
     if (input.endsWith(",")) {
       input = input.substring(0, input.length() - 1);
 
-      // Cria um array de strings para armazenar os valores dos ângulos
-      String enviarArray[9]; // 8 posições para valores enviados
-      int enviarIndex = 0;    // Índice do array
-      int startIndex = 0;    // Ponto de início para a extração de substrings
+      // Inicializa o índice e o ponto de início para a extração de substrings
+      int enviarIndex = 0;
+      int startIndex = 0;
 
       // Faz o parse da string de entrada e separa os valores dos dados enviados
       for (int i = 0; i < input.length(); i++) {
-        // Quando encontra uma vírgula, extrai o valor
         if (input.charAt(i) == ',') {
           enviarArray[enviarIndex] = input.substring(startIndex, i);
-          startIndex = i + 1; // Atualiza o índice de início
-          enviarIndex++;       // Incrementa o índice do array
+          startIndex = i + 1;
+          enviarIndex++;
         }
       }
-      // Armazena o último valor após a última vírgula
       enviarArray[enviarIndex] = input.substring(startIndex);
+
+      teste(); // Chama a função teste() para usar os valores do array
+
+  
 
       // CONTROLE DO SERVO DA DIREÇÃO: utiliza o primeiro valor (posição 0 do array)
       servo_direcao.write(enviarArray[0].toInt());
@@ -89,6 +83,8 @@ void loop() {
 
       // Alterna o estado do LED, quando uma informação chegar!
       digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+  
     }
   }
+}
 }
