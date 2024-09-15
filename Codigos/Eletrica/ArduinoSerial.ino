@@ -10,7 +10,7 @@ const byte MOTOR_2A = 16;
 const byte MOTOR_2B = 17;
 
 const byte LED_PIN = 13;       // Pino do LED integrado
-const byte SERVO_PIN = 12; // Pino para o controle do servo motor
+const byte SERVO_PIN = 6; // Pino para o controle do servo motor
 
 // Declaração do array global
 String enviarArray[9]; // 8 posições para valores enviados
@@ -65,9 +65,6 @@ void loop() {
       }
       enviarArray[enviarIndex] = input.substring(startIndex);
 
-      teste(); // Chama a função teste() para usar os valores do array
-
-  
 
       // CONTROLE DO SERVO DA DIREÇÃO: utiliza o primeiro valor (posição 0 do array)
       servo_direcao.write(enviarArray[0].toInt());
@@ -87,4 +84,4 @@ void loop() {
     }
   }
 }
-}
+
