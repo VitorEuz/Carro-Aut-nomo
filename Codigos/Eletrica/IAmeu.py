@@ -5,7 +5,7 @@ import serial
 
 # Configurações do Arduino
 COM_ARDUINO = True
-ARDUINO_PORT = 'COM3'
+ARDUINO_PORT = 'COM4'
 TEMPO_ENVIO = 0.4  # Tempo de envio em segundos
 
 def conectar_arduino(porta, baud_rate=9600):
@@ -62,7 +62,7 @@ def definir_roi(frame, roi_height):
     return roi
 
 # Configuração da câmera
-cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
 
 # Configuração da porta serial
 porta_serial = conectar_arduino(ARDUINO_PORT) if COM_ARDUINO else None
@@ -70,13 +70,13 @@ porta_serial = conectar_arduino(ARDUINO_PORT) if COM_ARDUINO else None
 cv2.namedWindow('Filtros')
 cv2.createTrackbar('Canny Low', 'Filtros', 50, 255, nothing)
 cv2.createTrackbar('Canny High', 'Filtros', 150, 255, nothing)
-cv2.createTrackbar('Threshold Low', 'Filtros', 147, 255, nothing)
+cv2.createTrackbar('Threshold Low', 'Filtros', 217, 255, nothing)
 cv2.createTrackbar('Threshold High', 'Filtros', 255, 255, nothing)
 cv2.createTrackbar('ROI Height', 'Filtros', 3, 10, nothing)
 
-distancia_desejada = 60  # Distância de pixels entre o ponto vermelho e a faixa escolhida
-setpointMin = 55
-setpointMax = 65
+distancia_desejada = 90  # Distância de pixels entre o ponto vermelho e a faixa escolhida
+setpointMin = distancia_desejada - 10
+setpointMax = distancia_desejada + 5
 dados = [0] * 9  # Inicializa o array dados com zeros
 
 
@@ -123,27 +123,27 @@ while True:
                 cv2.putText(diferenca_img, f'Diferenca Media: {int(diferenca_distancia)} pixels', (50, 50),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
 
-                if int(media_distancia) > setpointMax:
+                if int(media_distancia) < setpointMax:
                     print("Vai para 0")
-                    angle = int(50)
-                elif int(media_distancia) < setpointMin:
+                    angle = int(60)
+                elif int(media_distancia) > setpointMin:
                     print("Vai para 180")
-                    angle = int(130)
+                    angle = int(120)
                 elif int(media_distancia) > setpointMin and int(media_distancia) < setpointMax:
                     print("PARA")
                     angle = int(0)
 
 
                 #Eviar dados
-                dados[0] = angle
-                dados[1] = int(diferenca_distancia)
-                dados[2] = int(media_distancia)
+                dados[0] = angle #Angulo
+                dados[1] = 150   #Motor
+                dados[2] = 1     #Farois frontais
                 dados[3] = 0
                 dados[4] = 0
                 dados[5] = 0
                 dados[6] = 0
-                dados[7] = 0
-                dados[8] = 0
+                dados[7] = int(diferenca_distancia)
+                dados[8] = int(media_distancia)
 
                 cv2.imshow("Diferenca de Distancia", diferenca_img)
 
