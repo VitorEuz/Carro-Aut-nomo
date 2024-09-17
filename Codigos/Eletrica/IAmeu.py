@@ -8,6 +8,10 @@ COM_ARDUINO = True
 ARDUINO_PORT = 'COM4'
 TEMPO_ENVIO = 0.4  # Tempo de envio em segundos
 
+# Configurações Restantes
+camera = 1
+setpoint = 90
+
 def conectar_arduino(porta, baud_rate=9600):
     """Conecta ao Arduino na porta especificada e retorna o objeto Serial."""
     try:
@@ -62,7 +66,7 @@ def definir_roi(frame, roi_height):
     return roi
 
 # Configuração da câmera
-cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+cap = cv2.VideoCapture(camera, cv2.CAP_DSHOW)
 
 # Configuração da porta serial
 porta_serial = conectar_arduino(ARDUINO_PORT) if COM_ARDUINO else None
@@ -74,7 +78,7 @@ cv2.createTrackbar('Threshold Low', 'Filtros', 217, 255, nothing)
 cv2.createTrackbar('Threshold High', 'Filtros', 255, 255, nothing)
 cv2.createTrackbar('ROI Height', 'Filtros', 3, 10, nothing)
 
-distancia_desejada = 90  # Distância de pixels entre o ponto vermelho e a faixa escolhida
+distancia_desejada = setpoint  # Distância de pixels entre o ponto vermelho e a faixa escolhida
 setpointMin = distancia_desejada - 10
 setpointMax = distancia_desejada + 5
 dados = [0] * 9  # Inicializa o array dados com zeros
