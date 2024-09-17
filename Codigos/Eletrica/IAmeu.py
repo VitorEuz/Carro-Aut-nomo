@@ -77,6 +77,8 @@ cv2.createTrackbar('Canny High', 'Filtros', 150, 255, nothing)
 cv2.createTrackbar('Threshold Low', 'Filtros', 217, 255, nothing)
 cv2.createTrackbar('Threshold High', 'Filtros', 255, 255, nothing)
 cv2.createTrackbar('ROI Height', 'Filtros', 3, 10, nothing)
+cv2.createTrackbar('Velocidade Carro', 'Filtros', 0, 255, nothing)
+
 
 distancia_desejada = setpoint  # Distância de pixels entre o ponto vermelho e a faixa escolhida
 setpointMin = distancia_desejada - 10
@@ -101,6 +103,9 @@ while True:
     thresh_low = cv2.getTrackbarPos('Threshold Low', 'Filtros')
     thresh_high = cv2.getTrackbarPos('Threshold High', 'Filtros')
     roi_height = cv2.getTrackbarPos('ROI Height', 'Filtros') / 10.0
+    Velocidade = cv2.getTrackbarPos('Velocidade Carro', 'Filtros')
+
+
 
     roi = definir_roi(frame, roi_height)
     contours, edges = detectar_faixas_por_contornos(roi, canny_min, canny_max, thresh_low, thresh_high)
@@ -140,7 +145,7 @@ while True:
 
                 #Eviar dados
                 dados[0] = angle #Angulo
-                dados[1] = 150   #Motor
+                dados[1] = Velocidade   #Motor
                 dados[2] = 1     #Farois frontais
                 dados[3] = 0
                 dados[4] = 0
