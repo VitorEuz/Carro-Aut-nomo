@@ -15,14 +15,14 @@ Servo servo_direcao;
 
 
 // MOTOR 1: Pinos responsáveis pelo controle do motor 1
-const byte MOTOR_1A = 9;
-// MOTOR 2: Pinos responsáveis pelo controle do motor 2
-const byte MOTOR_2A = 10;
-
+const byte MOTOR_1R = 5;
+const byte MOTOR_1L = 6;
+const byte MOTOR_2R = 9;
+const byte MOTOR_2L = 10;
 
 const byte LED_PIN = 13;       // Pino do LED integrado
 const byte SERVO_PIN = 3; // Pino para o controle do servo motor
-const byte FarolFrontal= 7; // Pino para o controle dos farois fontrais
+const byte FarolFrontal= 4; // Pino para o controle dos farois fontrais
 
 void setup(){
   // Configura o pino do LED como saída
@@ -32,13 +32,23 @@ void setup(){
   // Configura o servo no pino especificado
   servo_direcao.attach(SERVO_PIN);
 
+  servo_direcao.write(90);
+
+
   // Configura os pinos dos motores como saídas
-  pinMode(MOTOR_1A, OUTPUT);
-  pinMode(MOTOR_2A, OUTPUT);
+  pinMode(MOTOR_1R, OUTPUT);
+  pinMode(MOTOR_1L, OUTPUT);
+  pinMode(MOTOR_2R, OUTPUT);
+  pinMode(MOTOR_2L, OUTPUT);
 
   // Inicializa os motores desligados (sem tensão)
-  analogWrite(MOTOR_1A, LOW);
-  analogWrite(MOTOR_2A, LOW);
+  digitalWrite(MOTOR_1R, LOW);
+  digitalWrite(MOTOR_1L, LOW);
+  digitalWrite(MOTOR_2R, LOW);
+  digitalWrite(MOTOR_2L, LOW);
+
+
+
 
   // Inicia a comunicação serial para receber comandos
   Serial.begin(9600);
@@ -80,16 +90,18 @@ void loop() {
       // CONTROLE DO SERVO DA DIREÇÃO: utiliza o primeiro valor (posição 0 do array)
       servo_direcao.write(enviarArray[0].toInt());
 
+
+
       // CONTROLE DE VELOCIDADE PARA FRENTE: utiliza o segundo valor (posição 1 do array)
       int speed = enviarArray[1].toInt();
+      analogWrite(MOTOR_1R, speed);
+      analogWrite(MOTOR_2R, speed);
 
-      // Aciona os motores para movimentação à frente com a velocidade especificada
-      analogWrite(MOTOR_1A, speed);
-      analogWrite(MOTOR_2A, speed);
+
 
       //Acende os leds frontais
       int ligadoF = enviarArray[2].toInt();
-      digitalWrite(farolFrente, ligadoF);
+      digitalWrite(FarolFrontal, ligadoF);
 
 
     }
