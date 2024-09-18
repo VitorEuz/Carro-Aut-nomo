@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import time
 import serial
+from simple_pid import PID
 
 # Configurações do Arduino
 COM_ARDUINO = True
@@ -10,7 +11,10 @@ TEMPO_ENVIO = 0.4  # Tempo de envio em segundos
 
 # Configurações Restantes
 camera = 1
-setpoint = 90
+setpoint = 150
+Kp = 0.1  # Ajuste os valores conforme necessário
+Ki = 0.0
+Kd = 0.0
 
 def conectar_arduino(porta, baud_rate=9600):
     """Conecta ao Arduino na porta especificada e retorna o objeto Serial."""
@@ -42,7 +46,6 @@ def detectar_faixas_por_contornos(frame, canny_min, canny_max, thresh_low, thres
 
 def calcular_distancia_horizontal(roi, ponto_central, contours):
     altura, largura = roi.shape[:2]
-    ponto_vermelho = (int(largura / 2), int(altura / 2))
     menor_distancia = float('inf')
     ponto_mais_proximo = None
 
@@ -81,16 +84,16 @@ cv2.createTrackbar('Velocidade Carro', 'Filtros', 0, 255, nothing)
 
 
 distancia_desejada = setpoint  # Distância de pixels entre o ponto vermelho e a faixa escolhida
-setpointMin = distancia_desejada - 10
-setpointMax = distancia_desejada + 5
 dados = [0] * 9  # Inicializa o array dados com zeros
-
-
 
 frame_count = 0
 distancias = []
 tempo_inicio = time.time()
 tempo_anterior = time.time()
+
+# Inicializa o PID
+pid = PID(Kp, Ki, Kd, setpoint=distancia_desejada)
+pid.output_limits = (30, 150)  # Limita a saída do PID entre 0 e 180
 
 while True:
     ret, frame = cap.read()
@@ -104,8 +107,6 @@ while True:
     thresh_high = cv2.getTrackbarPos('Threshold High', 'Filtros')
     roi_height = cv2.getTrackbarPos('ROI Height', 'Filtros') / 10.0
     Velocidade = cv2.getTrackbarPos('Velocidade Carro', 'Filtros')
-
-
 
     roi = definir_roi(frame, roi_height)
     contours, edges = detectar_faixas_por_contornos(roi, canny_min, canny_max, thresh_low, thresh_high)
@@ -132,25 +133,21 @@ while True:
                 cv2.putText(diferenca_img, f'Diferenca Media: {int(diferenca_distancia)} pixels', (50, 50),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
 
-                if int(media_distancia) < setpointMax:
-                    print("Vai para 0")
-                    angle = int(60)
-                elif int(media_distancia) > setpointMin:
-                    print("Vai para 180")
-                    angle = int(120)
-                elif int(media_distancia) > setpointMin and int(media_distancia) < setpointMax:
-                    print("PARA")
-                    angle = int(0)
+                # Calcula a saída do PID
+                pid.setpoint = distancia_desejada  # Define o setpoint para o PID
+                saida = pid(diferenca_distancia)  # A saída do PID deve estar entre 0 e 180
 
+                posicao_servo_ajustada = 90 + saida  # Ajusta o ângulo do servo motor
+                posicao_servo_ajustada = max(30, min(150, posicao_servo_ajustada))  # Limita entre 0 e 180 graus
 
-                #Eviar dados
-                dados[0] = angle #Angulo
-                dados[1] = Velocidade   #Motor
-                dados[2] = 1     #Farois frontais
+                # Enviar dados: agora a saída do PID vai diretamente para `dados[0]`
+                dados[0] = 100#int(posicao_servo_ajustada)  # Angulo ajustado pelo PID
+                dados[1] = Velocidade  # Velocidade do motorq
+                dados[2] = 1  # Faróis frontais
                 dados[3] = 0
                 dados[4] = 0
                 dados[5] = 0
-                dados[6] = 0
+                dados[6] = int(distancia_desejada)
                 dados[7] = int(diferenca_distancia)
                 dados[8] = int(media_distancia)
 
