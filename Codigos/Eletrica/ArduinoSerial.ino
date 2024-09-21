@@ -12,13 +12,8 @@ Array[2] = Farol Frontal
 
 Servo servo_direcao;
 
-
-
 // MOTOR 1: Pinos responsáveis pelo controle do motor 1
 const byte MOTOR_1R = 5;
-const byte MOTOR_1L = 6;
-const byte MOTOR_2R = 9;
-const byte MOTOR_2L = 10;
 
 const byte LED_PIN = 13;       // Pino do LED integrado
 const byte SERVO_PIN = 3; // Pino para o controle do servo motor
@@ -37,18 +32,6 @@ void setup(){
 
   // Configura os pinos dos motores como saídas
   pinMode(MOTOR_1R, OUTPUT);
-  pinMode(MOTOR_1L, OUTPUT);
-  pinMode(MOTOR_2R, OUTPUT);
-  pinMode(MOTOR_2L, OUTPUT);
-
-  // Inicializa os motores desligados (sem tensão)
-  digitalWrite(MOTOR_1R, LOW);
-  digitalWrite(MOTOR_1L, LOW);
-  digitalWrite(MOTOR_2R, LOW);
-  digitalWrite(MOTOR_2L, LOW);
-
-
-
 
   // Inicia a comunicação serial para receber comandos
   Serial.begin(9600);
@@ -80,24 +63,15 @@ void loop() {
           enviarIndex++;       // Incrementa o índice do array
         }
       }
-      //Mostra se a conexão serial está funfa
-      digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 
-      // Armazena o último valor após a última vírgula
-      enviarArray[enviarIndex] = input.substring(startIndex);
 
 
       // CONTROLE DO SERVO DA DIREÇÃO: utiliza o primeiro valor (posição 0 do array)
-      servo_direcao.write(enviarArray[0].toInt());
-
-
+      servo_direcao.write(enviarArray[1].toInt());
 
       // CONTROLE DE VELOCIDADE PARA FRENTE: utiliza o segundo valor (posição 1 do array)
-      int speed = enviarArray[1].toInt();
+      int speed = enviarArray[0].toInt();
       analogWrite(MOTOR_1R, speed);
-      analogWrite(MOTOR_2R, speed);
-
-
 
       //Acende os leds frontais
       int ligadoF = enviarArray[2].toInt();
