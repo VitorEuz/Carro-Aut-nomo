@@ -2,8 +2,6 @@
 Array[0] = SERVO
 Array[1] = MOTOR
 Array[2] = Farol Frontal
-
-
 */
 
 
@@ -12,18 +10,16 @@ Array[2] = Farol Frontal
 
 Servo servo_direcao;
 
-// MOTOR 1: Pinos responsáveis pelo controle do motor 1
 const byte MOTOR_1R = 5;
 
 const byte LED_PIN = 13;       // Pino do LED integrado
-const byte SERVO_PIN = 3; // Pino para o controle do servo motor
-const byte FarolFrontal= 4; // Pino para o controle dos farois fontrais
+const byte SERVO_PIN = 3;     // Pino para o controle do servo motor
+const byte FarolFrontal= 6;  // Pino para o controle dos farois fontrais
 
 void setup(){
   // Configura o pino do LED como saída
   pinMode(LED_PIN, OUTPUT);
   pinMode(FarolFrontal, OUTPUT);
-
   // Configura o servo no pino especificado
   servo_direcao.attach(SERVO_PIN);
 
@@ -75,7 +71,7 @@ void loop() {
 
       //Acende os leds frontais
       int ligadoF = enviarArray[2].toInt();
-      digitalWrite(FarolFrontal, ligadoF);
+      analogWrite(FarolFrontal, ligadoF);
 
 
     }
