@@ -1,184 +1,278 @@
+# Bibliotecas
 import cv2
+import cv2 as cv
 import numpy as np
-import time
+import math
 import serial
-from simple_pid import PID
+import time
 
-# Configurações do Arduino
-COM_ARDUINO = True
-ARDUINO_PORT = 'COM4'
-TEMPO_ENVIO = 0.4  # Tempo de envio em segundos
+DIREITA  = 0
+ESQUERDA = 1
 
-# Configurações Restantes
-camera = 1
-setpoint = 150
-Kp = 0.1  # Ajuste os valores conforme necessário
-Ki = 0.0
-Kd = 0.0
+ANALISAR_FAIXA = DIREITA
+DISTANCIA_CENTRO_FAIXA = 130 # distancia centro do veiculo / camera até a faixa, para controle
+KP = 0.3
+KI = 0.005
+KD = 0.05
+MIN = -31
+MAX = 32
 
-def conectar_arduino(porta, baud_rate=9600):
-    """Conecta ao Arduino na porta especificada e retorna o objeto Serial."""
-    try:
-        porta_serial = serial.Serial(porta, baud_rate)
-        time.sleep(1)  # Aguarda a comunicação serial estabilizar
-        return porta_serial
-    except serial.SerialException as e:
-        print(f"Erro ao conectar ao Arduino: {e}")
-        return None
+FRAME_WIDTH = int(1920 / 4)
+FRAME_HEIGHT = int(1080 / 4)
+FRAME_CENTER = int(FRAME_WIDTH / 2)
+print("Redimensionado: ", FRAME_WIDTH, "x", FRAME_HEIGHT)
 
-def enviar_dados_serial(porta_serial, dados):
-    """Envia dados pela porta serial para o Arduino."""
-    if porta_serial is not None:
-        porta_serial.write(dados.encode())
-    else:
-        print("Porta serial não está conectada.")
+# capura da area de interesse
+AREA_INT_INICIO = 200
+AREA_INT_FIM = 220
 
+# constantes de envio de informaçoes por serial
+ENVIAR_DADOS = True    # enviar dados para o arduino
+TEMPO_ENVIO  = 0.1      # tempo em segundos
+PORTA_COM    = 'COM4'  # porta COM para comunicar com Arduino
+porta_serial = None
+
+# vetor para envio de dados para o Arduino -> 8 bytes
+# posiçao 0 -> velocidade do carro: 0~255
+# posiçao 1 -> direção do carro: 0~180 onde 90 corresponde ao centro
+enviar_dados = [255, 140, 1, 0, 0, 0, 0, 0, 0]
+tempo_anterior = time.time()
+
+
+
+# Funcao: Class PID
+class pid_direcao:
+    # calibrado
+    kp = 0.0
+    ki = 0.0
+    kd = 0.0
+
+    # ajuste da integral inicial
+    i = 0
+
+    maxValor = 0
+    minValor = 0
+    setPoint = 0
+    lastTime = 0
+
+    def __init__(self, _setPoint, _kp, _ki, _kd, _minValor, _maxValor):
+        self.setPoint = _setPoint
+        self.kp = _kp
+        self.ki = _ki
+        self.kd = _kd
+        self.minValor = _minValor
+        self.maxValor = _maxValor
+
+    def calcularSaida(self, _entrada):
+        erro = self.setPoint - _entrada
+        deltaTempo = 0.1
+
+        # PID
+        p = self.kp * erro
+        self.i = (self.i + ((self.ki * erro) * deltaTempo))
+
+        d = (erro * self.kd) / deltaTempo
+
+        varPID = p + self.i + d
+        if varPID > self.maxValor:
+            varPID = self.maxValor
+        elif varPID < self.minValor:
+            varPID = self.minValor
+
+        return varPID
+
+
+
+# Função de callback para a trackbar, não faz nada por enquanto
 def nothing(x):
     pass
 
-def detectar_faixas_por_contornos(frame, canny_min, canny_max, thresh_low, thresh_high):
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(gray, thresh_low, thresh_high, cv2.THRESH_BINARY)
-    blurred = cv2.GaussianBlur(thresh, (5, 5), 0)
-    edges = cv2.Canny(blurred, canny_min, canny_max)
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    return contours, edges
+# Cria uma janela onde os controles serão exibidos
+cv.namedWindow('Controles')
 
-def calcular_distancia_horizontal(roi, ponto_central, contours):
-    altura, largura = roi.shape[:2]
-    menor_distancia = float('inf')
-    ponto_mais_proximo = None
-
-    if contours is not None:
-        for contour in contours:
-            for i in range(len(contour) - 1):
-                x1, y1 = contour[i][0]
-                x2, y2 = contour[i + 1][0]
-
-                if x1 > ponto_central[0] and x2 > ponto_central[0]:
-                    distancia = min(abs(x1 - ponto_central[0]), abs(x2 - ponto_central[0]))
-                    if distancia < menor_distancia:
-                        menor_distancia = distancia
-                        ponto_mais_proximo = (int((x1 + x2) / 2), int((y1 + y2) / 2))
-
-    return menor_distancia if menor_distancia != float('inf') else 0, ponto_mais_proximo
-
-def definir_roi(frame, roi_height):
-    altura, largura = frame.shape[:2]
-    roi = frame[int(altura * (1 - roi_height)):altura, :]
-    return roi
-
-# Configuração da câmera
-cap = cv2.VideoCapture(camera, cv2.CAP_DSHOW)
-
-# Configuração da porta serial
-porta_serial = conectar_arduino(ARDUINO_PORT) if COM_ARDUINO else None
-
-cv2.namedWindow('Filtros')
-cv2.createTrackbar('Canny Low', 'Filtros', 50, 255, nothing)
-cv2.createTrackbar('Canny High', 'Filtros', 150, 255, nothing)
-cv2.createTrackbar('Threshold Low', 'Filtros', 217, 255, nothing)
-cv2.createTrackbar('Threshold High', 'Filtros', 255, 255, nothing)
-cv2.createTrackbar('ROI Height', 'Filtros', 3, 10, nothing)
-cv2.createTrackbar('Velocidade Carro', 'Filtros', 0, 255, nothing)
+# Cria as trackbars (sliders) para controle de Hue, Saturation e Value
+cv.createTrackbar('canny_1', 'Controles', 200, 300, nothing)
+cv.createTrackbar('canny_2', 'Controles', 220, 400, nothing)
+cv.createTrackbar('velocidade', 'Controles', 0, 255, nothing)
 
 
-distancia_desejada = setpoint  # Distância de pixels entre o ponto vermelho e a faixa escolhida
-dados = [0] * 9  # Inicializa o array dados com zeros
+# Funcao: enviar_dados_serial()
+def calcular_distancia_centro_faixa(img, num_linhas, intervalo):
+    altura, largura = img.shape
 
-frame_count = 0
-distancias = []
-tempo_inicio = time.time()
-tempo_anterior = time.time()
+    centro_y = altura // 2
+    centro_x = largura // 2
 
-# Inicializa o PID
-pid = PID(Kp, Ki, Kd, setpoint=distancia_desejada)
-pid.output_limits = (30, 150)  # Limita a saída do PID entre 0 e 180
+    distancias_esquerda = []
+    distancias_direita = []
 
-while True:
-    ret, frame = cap.read()
-    if not ret or frame is None:
-        print("Erro ao capturar o frame")
-        break
+    # Iterar por linhas, saltando por 'intervalo' linhas
+    for i in range(centro_y - (num_linhas // 2) * intervalo, centro_y + (num_linhas // 2) * intervalo, intervalo):
+        if i < 0 or i >= altura:
+            continue  # Certifica de que não ultrapassar as bordas da imagem
 
-    canny_min = cv2.getTrackbarPos('Canny Low', 'Filtros')
-    canny_max = cv2.getTrackbarPos('Canny High', 'Filtros')
-    thresh_low = cv2.getTrackbarPos('Threshold Low', 'Filtros')
-    thresh_high = cv2.getTrackbarPos('Threshold High', 'Filtros')
-    roi_height = cv2.getTrackbarPos('ROI Height', 'Filtros') / 10.0
-    Velocidade = cv2.getTrackbarPos('Velocidade Carro', 'Filtros')
+        # Analisar pista direita (centro -> direita)
+        for x_direita in range(centro_x, largura):
+            if img[i, x_direita] >= 50:  # Detecta um pixel branco
+                distancias_direita.append(x_direita - centro_x)
+                break
 
-    roi = definir_roi(frame, roi_height)
-    contours, edges = detectar_faixas_por_contornos(roi, canny_min, canny_max, thresh_low, thresh_high)
+        # Analisar pista esquerda (centro -> esquerda)
+        for x_esquerda in range(centro_x, -1, -1):
+            if img[i, x_esquerda] >= 50:  # Detecta um pixel branco
+                distancias_esquerda.append(centro_x - x_esquerda)
+                break
 
-    if contours is not None:
-        cv2.drawContours(roi, contours, -1, (0, 255, 0), 2)
-        ponto_central = (roi.shape[1] // 2, roi.shape[0] // 2)
-        distancia, ponto_mais_proximo = calcular_distancia_horizontal(roi, ponto_central, contours)
-        distancias.append(distancia)
-        frame_count += 1
+    # Se não encontrar branco em um dos lados, evitar divisão por zero
+    media_distancia_esquerda = np.mean(distancias_esquerda) if distancias_esquerda else float('inf')
+    media_distancia_direita = np.mean(distancias_direita) if distancias_direita else float('inf')
 
-        if frame_count == 5:
-            frame_count = 0
-            if time.time() - tempo_inicio >= 1.5:
-                media_distancia = np.mean(distancias)
-                diferenca_distancia = media_distancia - distancia_desejada
+    return media_distancia_esquerda, media_distancia_direita
 
-                distancia_img = np.zeros_like(roi)
-                cv2.putText(distancia_img, f'Distancia Media: {int(media_distancia)} pixels', (50, 50),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
-                cv2.imshow("Distancia", distancia_img)
 
-                diferenca_img = np.zeros_like(roi)
-                cv2.putText(diferenca_img, f'Diferenca Media: {int(diferenca_distancia)} pixels', (50, 50),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+# Funcao: enviar_dados_serial()
+def enviar_dados_serial():
+    global tempo_anterior
+    global enviar_dados
+    global TEMPO_ENVIO
+    global porta_serial
 
-                # Calcula a saída do PID
-                pid.setpoint = distancia_desejada  # Define o setpoint para o PID
-                saida = pid(diferenca_distancia)  # A saída do PID deve estar entre 0 e 180
+    if (time.time() - tempo_anterior)>=TEMPO_ENVIO:
+        preparar_dados = ""
+        for i in range(len(enviar_dados)):
+            preparar_dados = preparar_dados + str(enviar_dados[i]) + ","
+        preparar_dados = preparar_dados + "#"
+        print(preparar_dados)
 
-                posicao_servo_ajustada = 90 + saida  # Ajusta o ângulo do servo motor
-                posicao_servo_ajustada = max(30, min(150, posicao_servo_ajustada))  # Limita entre 0 e 180 graus
+        if ENVIAR_DADOS == True:
+            porta_serial.write(preparar_dados.encode())
 
-                # Enviar dados: agora a saída do PID vai diretamente para `dados[0]`
-                dados[0] = 100#int(posicao_servo_ajustada)  # Angulo ajustado pelo PID
-                dados[1] = Velocidade  # Velocidade do motorq
-                dados[2] = 1  # Faróis frontais
-                dados[3] = 0
-                dados[4] = 0
-                dados[5] = 0
-                dados[6] = int(distancia_desejada)
-                dados[7] = int(diferenca_distancia)
-                dados[8] = int(media_distancia)
-
-                cv2.imshow("Diferenca de Distancia", diferenca_img)
-
-                tempo_inicio = time.time()
-                distancias.clear()
-
-        cv2.circle(roi, ponto_central, 5, (0, 0, 255), -1)
-        if ponto_mais_proximo is not None:
-            cv2.line(roi, ponto_central, (ponto_mais_proximo[0], ponto_central[1]), (255, 0, 0), 2)
-            cv2.circle(roi, ponto_mais_proximo, 5, (255, 0, 0), -1)
-
-    cv2.imshow("Frame", frame)
-    cv2.imshow("ROI", roi)
-    cv2.imshow("Edges", edges)
-
-    if (time.time() - tempo_anterior) >= TEMPO_ENVIO:
-        enviar_dados = ""
-        for i in range(len(dados)):
-            enviar_dados += str(dados[i]) + ","
-        enviar_dados += "#"
-        print(enviar_dados)
-        enviar_dados_serial(porta_serial, enviar_dados)
         tempo_anterior = time.time()
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+# Funcao: fecharAplicativo()
+def fecharAplicativo():
+    if ENVIAR_DADOS == True:
+        porta_serial.close() # Fechar a porta serial
+
+    cap.release()
+    cv.destroyAllWindows()
+    quit()
+
+
+# **********************************#
+
+# Inicializa o controlador PID com ganhos KP, KI, KD
+pid_direcao = pid_direcao(DISTANCIA_CENTRO_FAIXA, KP, KI, KD, MIN, MAX)
+
+if ENVIAR_DADOS == True:
+    # Estabelecer conexao com o Arduino
+    porta_serial = serial.Serial(PORTA_COM, 9600)
+    time.sleep(1)
+
+# config. de saida de texto -> Plota na tela o texto
+font = cv.FONT_HERSHEY_SIMPLEX
+fontScale = 0.5
+fontCor = (0, 0, 255)  # BGR
+fontThickness = 1
+
+cap = cv.VideoCapture(1, cv2.CAP_DSHOW)
+
+while(1):
+    # pegar frame do video / camera
+    ret, frame = cap.read()
+
+    # se nao tiver imagem fecha a aplicacao
+    if not ret:
+        print("entrada cap nao detectado!")
+        # fechar programa jumto com as conexoes
+        fecharAplicativo()
+
+    # ajustar o tamanho do video, quanto menor mais rapido o processamento
+    frame = cv.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT))
+
+    imgFiltro = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+    imgFiltro = cv.GaussianBlur(imgFiltro, (5, 5), 0)
+
+    # valores iniciais para Filtro Canny, cannyThreshold1 = 280 e cannyThreshold2 = 380
+    # configurar o filtro Canny
+    canny_threshold_1 = cv.getTrackbarPos('canny_1', 'Controles')
+    canny_threshold_2 = cv.getTrackbarPos('canny_2', 'Controles')
+    imgFiltro = cv.Canny(imgFiltro, canny_threshold_1, canny_threshold_2)
+
+    # capura da area de interesse
+    x1, y1 = 0,AREA_INT_INICIO
+    x2, y2 = 480,AREA_INT_FIM
+    area_interesse = imgFiltro[min(y1, y2):max(y1, y2), min(x1, x2):max(x1, x2)]
+
+    # Configurações da função
+    num_linhas = 10  # Número de linhas a serem analisadas
+    intervalo = round((AREA_INT_FIM-AREA_INT_INICIO)/ num_linhas) # Intervalo entre as linhas analisadas
+
+    # Calcular as distâncias médias
+    media_esquerda, media_direita = calcular_distancia_centro_faixa(area_interesse, num_linhas, intervalo)
+
+    # distancia pista lado direito
+    if math.isinf(media_direita)==False:
+        ponto_superior_esquerdo = (FRAME_CENTER, AREA_INT_INICIO)
+        ponto_inferior_direito = (round(media_direita) + FRAME_CENTER, AREA_INT_FIM)
+        cv.rectangle(frame, ponto_superior_esquerdo, ponto_inferior_direito, (255, 0, 0), -1)
+
+        # Plota o texto da curva media_direito:
+        text = str(media_direita)
+        posicao = (int((FRAME_CENTER + 30)), AREA_INT_INICIO-10)
+        cv.putText(frame, text, posicao, font, fontScale, fontCor, fontThickness, cv.LINE_AA, False)
+
+
+    # distancia pista lado esquerdo
+    if math.isinf(media_esquerda)==False:
+        ponto_superior_esquerdo = (FRAME_CENTER, AREA_INT_INICIO)
+        ponto_inferior_direito = (FRAME_CENTER - round(media_esquerda), AREA_INT_FIM)
+        cv.rectangle(frame, ponto_superior_esquerdo, ponto_inferior_direito, (0, 0, 255), -1)
+
+        # Plota o texto da curva media_esquerda:
+        text = str(media_esquerda)
+        posicao = (int((FRAME_CENTER - 60)), AREA_INT_INICIO-10)
+        cv.putText(frame, text, posicao, font, fontScale, fontCor, fontThickness, cv.LINE_AA, False)
+
+    # linha de centro
+    cv.line(frame,
+            (int(FRAME_WIDTH / 2), 0),
+            (int(FRAME_WIDTH / 2), FRAME_HEIGHT),
+            (0, 255, 255), 2)
+
+    # saidas das imagens processadas
+    cv.imshow("Saida de Videos", frame)
+    cv.imshow("Saida Filtro", imgFiltro)
+    cv.imshow("Area de Intersse", area_interesse)
+
+
+    # preparar informações para serem enviadas por serial
+    # controle da direção
+    if ANALISAR_FAIXA == DIREITA:
+        # Controlar o veiculo pela lado direito
+        if math.isinf(media_direita)==False:
+            enviar_dados[1] = round(pid_direcao.calcularSaida(media_direita))
+    else:
+        # Controlar o veiculo pela lado esquerdo
+        if math.isinf(media_esquerda)==False:
+            enviar_dados[1] = round(pid_direcao.calcularSaida(media_esquerda))
+
+    # mudança de faixa
+    if ANALISAR_FAIXA == DIREITA:
+        enviar_dados[1] = (enviar_dados[1]*-1)+ 85                                        # SERVO_DIREITA
+    elif ANALISAR_FAIXA == ESQUERDA:
+        enviar_dados[1] = enviar_dados[1] + 85                                           # SERVO_ESQUERDA
+    enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')   # VELOCIDADE
+    enviar_dados[2] = 150                                                                # FAROL_FRONTAL
+
+    # chama a funcao para enviar tudo por serial para o arduino
+    enviar_dados_serial()
+
+
+    # verificar tecla para fechar o programa
+    if cv.waitKey(1) == ord('q'):
         break
 
-cap.release()
-cv2.destroyAllWindows()
 
-if COM_ARDUINO and porta_serial:
-    porta_serial.close()
+# fechar programa jumto com as conexoes
+fecharAplicativo()
