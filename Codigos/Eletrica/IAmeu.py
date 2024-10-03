@@ -6,6 +6,7 @@ import math
 import serial
 import time
 
+
 DIREITA  = 0
 ESQUERDA = 1
 
@@ -26,10 +27,15 @@ print("Redimensionado: ", FRAME_WIDTH, "x", FRAME_HEIGHT)
 AREA_INT_INICIO = 200
 AREA_INT_FIM = 220
 
+#Valor da Webcam
+portaWeb = 0
+
 # constantes de envio de informaçoes por serial
 ENVIAR_DADOS = True    # enviar dados para o arduino
 TEMPO_ENVIO  = 0.1      # tempo em segundos
+TEMPO_LER = 1.0
 PORTA_COM    = 'COM4'  # porta COM para comunicar com Arduino
+PORTA_COM_LER = 'COM6'
 porta_serial = None
 
 # vetor para envio de dados para o Arduino -> 8 bytes
@@ -81,8 +87,6 @@ class pid_direcao:
 
         return varPID
 
-
-
 # Função de callback para a trackbar, não faz nada por enquanto
 def nothing(x):
     pass
@@ -129,6 +133,31 @@ def calcular_distancia_centro_faixa(img, num_linhas, intervalo):
 
     return media_distancia_esquerda, media_distancia_direita
 
+def ler_dados_arduino():
+    # Configurar a porta serial
+    porta_serial = serial.Serial(PORTA_COM_LER, 9600)
+    time.sleep(2)  # Aguarda a conexão ser estabilizada
+
+    while True:
+        if porta_serial.in_waiting > 0:
+            # Lê a string até encontrar o caractere '#'
+            input_data = porta_serial.readline().decode().strip()
+
+            # Verifica se a string termina com '#'
+            if input_data.endswith("#"):
+                input_data = input_data[:-1]  # Remove o '#'
+
+                # Divide os dados em partes
+                dados = input_data.split(',')
+                if len(dados) == 5:  # Verifica se temos 5 valores
+                    valor_1 = int(dados[0])
+                    valor_2 = int(dados[1])
+                    valor_3 = int(dados[2])
+                    valor_4 = int(dados[3])
+                    valor_5 = int(dados[4])
+
+                    # Retornar os valores
+                    return valor_1, valor_2, valor_3, valor_4, valor_5
 
 # Funcao: enviar_dados_serial()
 def enviar_dados_serial():
@@ -175,7 +204,10 @@ fontScale = 0.5
 fontCor = (0, 0, 255)  # BGR
 fontThickness = 1
 
-cap = cv.VideoCapture(1, cv2.CAP_DSHOW)
+cap = cv.VideoCapture(portaWeb, cv2.CAP_DSHOW)
+
+valores = ler_dados_arduino()
+valor_1, valor_2, valor_3, valor_4, valor_5 = valores
 
 while(1):
     # pegar frame do video / camera
@@ -222,7 +254,6 @@ while(1):
         posicao = (int((FRAME_CENTER + 30)), AREA_INT_INICIO-10)
         cv.putText(frame, text, posicao, font, fontScale, fontCor, fontThickness, cv.LINE_AA, False)
 
-
     # distancia pista lado esquerdo
     if math.isinf(media_esquerda)==False:
         ponto_superior_esquerdo = (FRAME_CENTER, AREA_INT_INICIO)
@@ -245,30 +276,28 @@ while(1):
     cv.imshow("Saida Filtro", imgFiltro)
     cv.imshow("Area de Intersse", area_interesse)
 
-
+#----------------------------------------------------------------------------------------------------------------------
+    teste= valor_1 + 1
     # preparar informações para serem enviadas por serial
     # controle da direção
     if ANALISAR_FAIXA == DIREITA:
         # Controlar o veiculo pela lado direito
         if math.isinf(media_direita)==False:
             enviar_dados[1] = round(pid_direcao.calcularSaida(media_direita))
+            enviar_dados[1] = (enviar_dados[1] * -1) + 85
     else:
         # Controlar o veiculo pela lado esquerdo
         if math.isinf(media_esquerda)==False:
             enviar_dados[1] = round(pid_direcao.calcularSaida(media_esquerda))
+            enviar_dados[1] = enviar_dados[1] + 85
 
-    # mudança de faixa
-    if ANALISAR_FAIXA == DIREITA:
-        enviar_dados[1] = (enviar_dados[1]*-1)+ 85                                        # SERVO_DIREITA
-    elif ANALISAR_FAIXA == ESQUERDA:
-        enviar_dados[1] = enviar_dados[1] + 85                                           # SERVO_ESQUERDA
     enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')   # VELOCIDADE
     enviar_dados[2] = 150                                                                # FAROL_FRONTAL
+    enviar_dados[3] = valor_1
+# ----------------------------------------------------------------------------------------------------------------------
 
     # chama a funcao para enviar tudo por serial para o arduino
     enviar_dados_serial()
-
-
     # verificar tecla para fechar o programa
     if cv.waitKey(1) == ord('q'):
         break
