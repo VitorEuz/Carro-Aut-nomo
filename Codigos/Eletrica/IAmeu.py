@@ -156,6 +156,8 @@ def ler_dados_arduino():
                     valor_4 = int(dados[3])
                     valor_5 = int(dados[4])
 
+                    time.sleep(1)
+
                     # Retornar os valores
                     return valor_1, valor_2, valor_3, valor_4, valor_5
 
@@ -205,11 +207,11 @@ fontCor = (0, 0, 255)  # BGR
 fontThickness = 1
 
 cap = cv.VideoCapture(portaWeb, cv2.CAP_DSHOW)
-
 valores = ler_dados_arduino()
 valor_1, valor_2, valor_3, valor_4, valor_5 = valores
 
 while(1):
+
     # pegar frame do video / camera
     ret, frame = cap.read()
 
@@ -276,11 +278,13 @@ while(1):
     cv.imshow("Saida Filtro", imgFiltro)
     cv.imshow("Area de Intersse", area_interesse)
 
+
+
+
 #----------------------------------------------------------------------------------------------------------------------
-    teste= valor_1 + 1
     # preparar informações para serem enviadas por serial
     # controle da direção
-    if ANALISAR_FAIXA == DIREITA:
+    if valor_1 == 0:
         # Controlar o veiculo pela lado direito
         if math.isinf(media_direita)==False:
             enviar_dados[1] = round(pid_direcao.calcularSaida(media_direita))
@@ -294,6 +298,7 @@ while(1):
     enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')   # VELOCIDADE
     enviar_dados[2] = 150                                                                # FAROL_FRONTAL
     enviar_dados[3] = valor_1
+
 # ----------------------------------------------------------------------------------------------------------------------
 
     # chama a funcao para enviar tudo por serial para o arduino
