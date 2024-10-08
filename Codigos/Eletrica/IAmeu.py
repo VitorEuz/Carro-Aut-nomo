@@ -9,8 +9,9 @@ import time
 
 DIREITA  = 0
 ESQUERDA = 1
+AMBOS = 2
 
-ANALISAR_FAIXA = DIREITA
+ANALISAR_FAIXA = AMBOS
 DISTANCIA_CENTRO_FAIXA = 130 # distancia centro do veiculo / camera até a faixa, para controle
 KP = 0.3
 KI = 0.005
@@ -28,10 +29,10 @@ AREA_INT_INICIO = 200
 AREA_INT_FIM = 220
 
 #Valor da Webcam
-portaWeb = 1
+portaWeb = 0
 
 # constantes de envio de informaçoes por serial
-ENVIAR_DADOS = True    # enviar dados para o arduino
+ENVIAR_DADOS = False    # enviar dados para o arduino
 TEMPO_ENVIO  = 0.1      # tempo em segundos
 PORTA_COM    = 'COM3'  # porta COM para comunicar com Arduino
 porta_serial = None
@@ -250,14 +251,15 @@ while(1):
 #----------------------------------------------------------------------------------------------------------------------
     # preparar informações para serem enviadas por serial
     # controle da direção
-    if ANALISAR_FAIXA == DIREITA:
+        # Controlar o veiculo pela lado esquerdo
+    if ANALISAR_FAIXA == AMBOS:
         # Controlar o veiculo pela lado direito
-        if math.isinf(media_direita)==False:
+        if math.isinf(media_direita) == False:
             enviar_dados[2] = round(pid_direcao.calcularSaida(media_direita))
             enviar_dados[2] = (enviar_dados[2] * -1) + 85
-    else:
+    if ANALISAR_FAIXA == AMBOS:
         # Controlar o veiculo pela lado esquerdo
-        if math.isinf(media_esquerda)==False:
+        if math.isinf(media_esquerda) == False:
             enviar_dados[3] = round(pid_direcao.calcularSaida(media_esquerda))
             enviar_dados[3] = enviar_dados[3] + 85
 
