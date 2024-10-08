@@ -1,37 +1,54 @@
 /*
-Array[0] = SERVO
-Array[1] = MOTOR
-Array[2] = Farol Frontal
+PonteH = 5 PWM
+Servo = 3 PWM
+FarolFrontal = 6 PWM
+
+LedIndicadorDireito = 7
+LedIndicadorEsquerdo = 4
+
+BotãoDireto = A5
+BotãoEsquerdo = A4
+
+Array[0] = MOTOR
+Array[1] = Farol Frontal
+Array[2] = SERVO DIREITA
+Array[3] = SERVO ESQUERDO
 */
-
-
 
 #include <Servo.h>
 
 Servo servo_direcao;
 
 const byte MOTOR_1R = 5;
+const byte FaroisFrontal = 13;        
+const byte SERVO_PIN = 3;       
+const byte FarolFrontal = 6;
 
-const byte LED_PIN = 13;       // Pino do LED integrado
-const byte SERVO_PIN = 3;     // Pino para o controle do servo motor
-const byte FarolFrontal= 6;  // Pino para o controle dos farois fontrais
+const int botaoDireito = A5;
+const int botaoEsquerdo = A4; 
+const byte LedIndicadorDireito = 7;
+const byte LedIndicadorEsquerdo = 4;
 
-void setup(){
-  // Configura o pino do LED como saída
-  pinMode(LED_PIN, OUTPUT);
+bool botaoSelecionado = false;
+
+void setup() {
+  pinMode(FaroisFrontal, OUTPUT);
   pinMode(FarolFrontal, OUTPUT);
-  // Configura o servo no pino especificado
-  servo_direcao.attach(SERVO_PIN);
+  pinMode(MOTOR_1R, OUTPUT);
+  pinMode(LedIndicadorDireito, OUTPUT);
+  pinMode(LedIndicadorEsquerdo, OUTPUT);
 
+  pinMode(botaoDireito, INPUT_PULLUP);  
+  pinMode(botaoEsquerdo, INPUT_PULLUP);
+
+  servo_direcao.attach(SERVO_PIN);
   servo_direcao.write(90);
 
+  digitalWrite(LedIndicadorDireito, HIGH); 
+  digitalWrite(LedIndicadorEsquerdo, HIGH);
 
-  // Configura os pinos dos motores como saídas
-  pinMode(MOTOR_1R, OUTPUT);
-
-  // Inicia a comunicação serial para receber comandos
   Serial.begin(9600);
-  delay(500); // Pequeno atraso para estabilização
+  delay(500);
 }
 
 void loop() {
@@ -63,15 +80,21 @@ void loop() {
 
 
       // CONTROLE DO SERVO DA DIREÇÃO: utiliza o primeiro valor (posição 0 do array)
-      servo_direcao.write(enviarArray[1].toInt());
+      servo_direcao.write(enviarArray[2].toInt());
 
       // CONTROLE DE VELOCIDADE PARA FRENTE: utiliza o segundo valor (posição 1 do array)
       int speed = enviarArray[0].toInt();
       analogWrite(MOTOR_1R, speed);
 
       //Acende os leds frontais
-      int ligadoF = enviarArray[2].toInt();
+      int ligadoF = enviarArray[1].toInt();
       analogWrite(FarolFrontal, ligadoF);
+
+      // CONTROLE DO SERVO DA DIREÇÃO: utiliza o primeiro valor (posição 0 do array)
+      servo_direcao.write(enviarArray[2].toInt());
+
+      // CONTROLE DO SERVO DA DIREÇÃO: utiliza o primeiro valor (posição 0 do array)
+      //servo_direcao.write(enviarArray[3].toInt());
 
 
     }
