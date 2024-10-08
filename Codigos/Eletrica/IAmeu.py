@@ -28,12 +28,12 @@ AREA_INT_INICIO = 200
 AREA_INT_FIM = 220
 
 #Valor da Webcam
-portaWeb = 0
+portaWeb = 1
 
 # constantes de envio de informaçoes por serial
 ENVIAR_DADOS = True    # enviar dados para o arduino
 TEMPO_ENVIO  = 0.1      # tempo em segundos
-PORTA_COM    = 'COM4'  # porta COM para comunicar com Arduino
+PORTA_COM    = 'COM3'  # porta COM para comunicar com Arduino
 porta_serial = None
 
 # vetor para envio de dados para o Arduino -> 8 bytes
@@ -265,6 +265,8 @@ while(1):
     enviar_dados[1] = 150                                                                 # FAROL_FRONTAL
     #enviar_dados[2] = DIREITA
     #enviar_dados[3] = ESQUERDA
+
+    #enviar_dados[4] = variavel para diminuir a velocidade
 
 
 # ----------------------------------------------------------------------------------------------------------------------
