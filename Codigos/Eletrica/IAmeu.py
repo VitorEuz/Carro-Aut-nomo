@@ -10,9 +10,10 @@ import time
 DIREITA  = 0
 ESQUERDA = 1
 AMBOS = 2
+RETO = 3
 
-ANALISAR_FAIXA = AMBOS
-DISTANCIA_CENTRO_FAIXA = 130 # distancia centro do veiculo / camera até a faixa, para controle
+ANALISAR_FAIXA = 0
+DISTANCIA_CENTRO_FAIXA = 170 # distancia centro do veiculo / camera até a faixa, para controle
 KP = 0.3
 KI = 0.005
 KD = 0.05
@@ -32,16 +33,17 @@ AREA_INT_FIM = 220
 portaWeb = 0
 
 # constantes de envio de informaçoes por serial
-ENVIAR_DADOS = False    # enviar dados para o arduino
+ENVIAR_DADOS = True    # enviar dados para o arduino
 TEMPO_ENVIO  = 0.1      # tempo em segundos
-PORTA_COM    = 'COM3'  # porta COM para comunicar com Arduino
+PORTA_COM    = 'COM7'  # porta COM para comunicar com Arduino
 porta_serial = None
 
 # vetor para envio de dados para o Arduino -> 8 bytes
 # posiçao 0 -> velocidade do carro: 0~255
 # posiçao 1 -> direção do carro: 0~180 onde 90 corresponde ao centro
-enviar_dados = [255, 140, 1, 0, 0, 0, 0, 0, 0]
+enviar_dados = [255, 150, 90, 90, 0, 0, 0, 0, 0]
 tempo_anterior = time.time()
+
 
 
 
@@ -97,6 +99,9 @@ cv.namedWindow('Controles')
 cv.createTrackbar('canny_1', 'Controles', 200, 300, nothing)
 cv.createTrackbar('canny_2', 'Controles', 220, 400, nothing)
 cv.createTrackbar('velocidade', 'Controles', 0, 255, nothing)
+cv.createTrackbar('Lado','Controles',2,4,nothing)
+cv.createTrackbar('pare','Controles',0,1,nothing)
+
 
 
 # Funcao: enviar_dados_serial()
@@ -130,7 +135,10 @@ def calcular_distancia_centro_faixa(img, num_linhas, intervalo):
     media_distancia_esquerda = np.mean(distancias_esquerda) if distancias_esquerda else float('inf')
     media_distancia_direita = np.mean(distancias_direita) if distancias_direita else float('inf')
 
-    return media_distancia_esquerda, media_distancia_direita
+    faixaEsquerda = media_distancia_esquerda
+    faixaDireita = media_distancia_direita
+
+    return media_distancia_esquerda, media_distancia_direita, faixaEsquerda, faixaDireita
 
 # Funcao: enviar_dados_serial()
 def enviar_dados_serial():
@@ -210,7 +218,7 @@ while(1):
     intervalo = round((AREA_INT_FIM-AREA_INT_INICIO)/ num_linhas) # Intervalo entre as linhas analisadas
 
     # Calcular as distâncias médias
-    media_esquerda, media_direita = calcular_distancia_centro_faixa(area_interesse, num_linhas, intervalo)
+    media_esquerda, media_direita,faixaEsquerda,faixaDireita = calcular_distancia_centro_faixa(area_interesse, num_linhas, intervalo)
 
     # distancia pista lado direito
     if math.isinf(media_direita)==False:
@@ -245,30 +253,59 @@ while(1):
     cv.imshow("Saida Filtro", imgFiltro)
     cv.imshow("Area de Intersse", area_interesse)
 
+    # Captura o valor atual da trackbar 'Lado'
+    Lado = cv.getTrackbarPos('Lado', 'Controles')
+
+    pare = cv.getTrackbarPos('pare', 'Controles')
+
+    # Define qual faixa deve ser analisada com base no valor da trackbar
 
 
-
-#----------------------------------------------------------------------------------------------------------------------
-    # preparar informações para serem enviadas por serial
-    # controle da direção
-        # Controlar o veiculo pela lado esquerdo
-    if ANALISAR_FAIXA == AMBOS:
-        # Controlar o veiculo pela lado direito
-        if math.isinf(media_direita) == False:
-            enviar_dados[2] = round(pid_direcao.calcularSaida(media_direita))
-            enviar_dados[2] = (enviar_dados[2] * -1) + 85
-    if ANALISAR_FAIXA == AMBOS:
-        # Controlar o veiculo pela lado esquerdo
-        if math.isinf(media_esquerda) == False:
-            enviar_dados[3] = round(pid_direcao.calcularSaida(media_esquerda))
-            enviar_dados[3] = enviar_dados[3] + 85
+    #----------------------------------------------------------------------------------------------------------------------
 
     enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')   # VELOCIDADE
-    enviar_dados[1] = 150                                                                 # FAROL_FRONTAL
-    #enviar_dados[2] = DIREITA
-    #enviar_dados[3] = ESQUERDA
+    enviar_dados[1] = 150                                                               # FAROL_FRONTAL
 
-    #enviar_dados[4] = variavel para diminuir a velocidade
+    if pare == 0:
+        # O CARRO VAI CONTINUAR NORMAL
+        enviar_dados[4] = 0
+    else:
+        # O CARRO VAI PARAR
+        enviar_dados[4] = 1
+
+    if Lado == 0:
+        enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')  # VELOCIDADE
+        # Controlar o veiculo pela lado direito
+        if not math.isinf(media_direita):
+            enviar_dados[2] = round(pid_direcao.calcularSaida(media_direita))
+            enviar_dados[2] = (enviar_dados[2] * -1) + 85
+    elif Lado == 1:
+        enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')  # VELOCIDADE
+        # Controlar o veiculo pela lado esquerdo
+        if not math.isinf(media_esquerda):
+            enviar_dados[3] = round(pid_direcao.calcularSaida(media_esquerda))
+            enviar_dados[3] = enviar_dados[3] + 85
+    elif Lado == 2:
+        enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')  # VELOCIDADE
+        if not math.isinf(media_direita):
+            enviar_dados[2] = round(pid_direcao.calcularSaida(media_direita))
+            enviar_dados[2] = (enviar_dados[2] * -1) + 85
+        if not math.isinf(media_esquerda):
+            enviar_dados[3] = round(pid_direcao.calcularSaida(media_esquerda))
+            enviar_dados[3] = enviar_dados[3] + 85
+    else:
+        enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')  # VELOCIDADE
+        if not math.isinf(media_direita):
+            enviar_dados[2] = 90
+        if not math.isinf(media_esquerda):
+            enviar_dados[3] = 90
+
+
+    #enviar_dados[6] = faixaDireita  #valor da faixa da direita
+    #enviar_dados[7] = faixaEsquerda #valor da faixa da esquerda
+    enviar_dados[8] = ANALISAR_FAIXA
+
+
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -278,6 +315,7 @@ while(1):
     # verificar tecla para fechar o programa
     if cv2.waitKey(1) == 27:  # 27 é o código ASCII para a tecla ESC
         break
+
 
 
 # fechar programa jumto com as conexoes
