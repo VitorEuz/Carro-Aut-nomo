@@ -29,7 +29,10 @@ const int botaoEsquerdo = A4;
 const byte LedIndicadorDireito = 7;
 const byte LedIndicadorEsquerdo = 4;
 
-bool botaoSelecionado = false;
+bool estadoDireito = false;
+bool estadoEsquerdo = false;
+
+int ladocerto = 5;
 
 void setup() {
   pinMode(FaroisFrontal, OUTPUT);
@@ -52,6 +55,25 @@ void setup() {
 }
 
 void loop() {
+
+  if (digitalRead(botaoDireito) == LOW) {
+    if (!estadoDireito) {
+      digitalWrite(LedIndicadorDireito, HIGH);
+      digitalWrite(LedIndicadorEsquerdo, LOW);
+      ladocerto = 0;
+      estadoDireito = true;
+      estadoEsquerdo = false;
+    }
+  } else if (digitalRead(botaoEsquerdo) == LOW) {
+    if (!estadoEsquerdo) {
+      digitalWrite(LedIndicadorDireito, LOW);
+      digitalWrite(LedIndicadorEsquerdo, HIGH);
+      ladocerto = 1;
+      estadoEsquerdo = true;
+      estadoDireito = false;
+    }
+  }
+
   // Verifica se há dados disponíveis na comunicação serial
   if (Serial.available() > 0) {
     // Lê a string até encontrar o caractere '#'
@@ -77,26 +99,49 @@ void loop() {
         }
       }
 
-
-
-      // CONTROLE DO SERVO DA DIREÇÃO: utiliza o primeiro valor (posição 0 do array)
-      servo_direcao.write(enviarArray[2].toInt());
-
+      /*
       // CONTROLE DE VELOCIDADE PARA FRENTE: utiliza o segundo valor (posição 1 do array)
       int speed = enviarArray[0].toInt();
       analogWrite(MOTOR_1R, speed);
+      */
+
+      controlarMotor(enviarArray);
 
       //Acende os leds frontais
       int ligadoF = enviarArray[1].toInt();
       analogWrite(FarolFrontal, ligadoF);
 
-      // CONTROLE DO SERVO DA DIREÇÃO: utiliza o primeiro valor (posição 0 do array)
-      servo_direcao.write(enviarArray[2].toInt());
-
-      // CONTROLE DO SERVO DA DIREÇÃO: utiliza o primeiro valor (posição 0 do array)
-      //servo_direcao.write(enviarArray[3].toInt());
-
-
+      if (ladocerto == 0){
+       servo_direcao.write(enviarArray[2].toInt()); 
+      }else {
+        servo_direcao.write(enviarArray[3].toInt());}     
     }
+  }
+}
+
+// Função para controlar a desaceleração e restauração da velocidade
+void controlarMotor(String enviarArray[]) {
+  int speed = enviarArray[0].toInt();    // Velocidade recebida
+  int controle = enviarArray[4].toInt(); // Controle (0 ou 1)
+
+  static int lastSpeed = 0; // Armazena a última velocidade antes da desaceleração
+
+  if (controle == 0) {
+    // Se controle for 0, aplica a velocidade normal
+    analogWrite(MOTOR_1R, speed);
+    lastSpeed = speed; // Armazena a última velocidade usada
+  } else if (controle == 1) {
+    // Se controle for 1, desacelera o motor gradualmente
+    while (speed > 0) {
+      speed--;
+      analogWrite(MOTOR_1R, speed);
+      delay(20); // Controla a taxa de desaceleração (ajuste conforme necessário)
+    }
+    analogWrite(MOTOR_1R, 0); // Garante que o motor esteja completamente parado
+  }
+  
+  // Caso o controle volte a 0, restaura a última velocidade
+  if (controle == 0 && speed == 0) {
+    analogWrite(MOTOR_1R, lastSpeed);
   }
 }
