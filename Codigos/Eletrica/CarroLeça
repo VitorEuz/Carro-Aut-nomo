@@ -32,7 +32,8 @@ AREA_INT_INICIO = 200
 AREA_INT_FIM = 220
 
 #Valor da Webcam
-portaWeb = 0
+CameraFaixa = 0
+CameraPlaca = 0
 
 # constantes de envio de informaçoes por serial
 ENVIAR_DADOS = False    # enviar dados para o arduino
@@ -238,8 +239,8 @@ fontThickness = 1
 line_start = (100, 300)  # Ponto inicial da linha
 line_end = (500, 300)    # Ponto final da linha
 
-cap = cv.VideoCapture(portaWeb, cv2.CAP_DSHOW)
-cap2 = cv2.VideoCapture(portaWeb, cv2.CAP_DSHOW)
+cap = cv.VideoCapture(CameraFaixa, cv2.CAP_DSHOW)
+cap2 = cv2.VideoCapture(CameraPlaca, cv2.CAP_DSHOW)
 
 while cap.isOpened() and cap2.isOpened():
 # ------------------------------CODIGO 2---------------------------------------------------------------------
