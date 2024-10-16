@@ -35,6 +35,10 @@ bool estadoEsquerdo = false;
 int ladocerto = 5;
 int controlePare = 0;
 
+unsigned long lastTime = 0;
+bool parou = false;
+
+
 void setup() {
   pinMode(FaroisFrontal, OUTPUT);
   pinMode(FarolFrontal, OUTPUT);
@@ -106,12 +110,35 @@ void loop() {
       analogWrite(MOTOR_1R, speed);
       */
 
-      int controle = enviarArray[4].toInt();
-      if (controlePare == 0){
-        analogWrite(MOTOR_1R, enviarArray[0].toInt());
-      }else {
-        analogWrite(MOTOR_1R, 0);}
+      int speed = enviarArray[0].toInt();
+      int Placa = enviarArray[5].toInt();
+      int Semaforo = enviarArray[6].toInt();
+      int Pessoa = enviarArray[7].toInt();
+      
+      /*
+      if (Placa == 1 || Semaforo == 1 || Pessoa == 1) {
+        analogWrite(MOTOR_1R, 0);
+      } else {
+        analogWrite(MOTOR_1R, speed);}
+        */
 
+      if (Placa == 1 && !parou) {
+        analogWrite(MOTOR_1R, 0);
+        parou = true;  // Indica que o processo de parar começou
+        lastTime = millis();  // Marca o tempo que começou a pausa de 5 segundos
+      }
+
+      // Verifica se se passaram 5 segundos desde que a placa 1 foi detectada
+      if (parou && (millis() - lastTime >= 5000)) {
+        analogWrite(MOTOR_1R, speed);
+        parou = false;  // Reseta para permitir uma nova parada se necessário
+      }
+
+      // Se placa for 0, imprime "ande" normalmente, desde que não esteja no estado de parada
+      if (Placa == 0 && !parou) {
+        analogWrite(MOTOR_1R, speed);
+      }
+      
       //Acende os leds frontais
       int ligadoF = enviarArray[1].toInt();
       analogWrite(FarolFrontal, ligadoF);
@@ -121,29 +148,5 @@ void loop() {
       }else {
         servo_direcao.write(enviarArray[3].toInt());}     
     } 
-  }
-}
-
-void controlarMotor(String enviarArray[]) {
-  int speed = enviarArray[1].toInt();    // Velocidade recebida
-  int controle = enviarArray[4].toInt(); // Controle (0 ou 1)
-
-  static int lastSpeed = 0; // Armazena a última velocidade antes da desaceleração
-
-  if (controle == 0) {
-    // Se controle for 0, aumenta a velocidade gradualmente
-    while (lastSpeed < speed) {
-      lastSpeed++;
-      analogWrite(MOTOR_1R, lastSpeed);
-      delay(20); // Controla a taxa de aceleração
-    }
-  } else if (controle == 1) {
-    // Se controle for 1, desacelera o motor gradualmente
-    while (lastSpeed > 0) {
-      lastSpeed--;
-      analogWrite(MOTOR_1R, lastSpeed);
-      delay(20); // Controla a taxa de desaceleração
-    }
-    analogWrite(MOTOR_1R, 0); // Garante que o motor esteja completamente parado
   }
 }
