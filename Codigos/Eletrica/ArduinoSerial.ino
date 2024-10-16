@@ -114,6 +114,10 @@ void loop() {
       int Placa = enviarArray[5].toInt();
       int Semaforo = enviarArray[6].toInt();
       int Pessoa = enviarArray[7].toInt();
+
+      unsigned long previousMillis = 0;  // Armazena o tempo anterior
+      bool saidaAtiva = false;
+      bool entradaAtiva = false;
       
       /*
       if (Placa == 1 || Semaforo == 1 || Pessoa == 1) {
@@ -122,22 +126,36 @@ void loop() {
         analogWrite(MOTOR_1R, speed);}
         */
 
-      if (Placa == 1 && !parou) {
+      unsigned long currentMillis = millis();  // Pega o tempo atual
+
+      if (Placa == 1 && !saidaAtiva && !entradaAtiva) {
+        // Quando o valor é 1 e não está no estado de "saída" ou "entrada"
         analogWrite(MOTOR_1R, 0);
-        parou = true;  // Indica que o processo de parar começou
-        lastTime = millis();  // Marca o tempo que começou a pausa de 5 segundos
+        previousMillis = currentMillis;  // Armazena o tempo atual
+        saidaAtiva = true;               // Ativa o estado de "saída"
       }
 
-      // Verifica se se passaram 5 segundos desde que a placa 1 foi detectada
-      if (parou && (millis() - lastTime >= 5000)) {
-        analogWrite(MOTOR_1R, speed);
-        parou = false;  // Reseta para permitir uma nova parada se necessário
+      // Mantém "saída" por 5 segundos
+      if (saidaAtiva && (currentMillis - previousMillis >= 5000)) {
+        analogWrite(MOTOR_1R, speed);       // Após 5 segundos, imprime "entrada"
+        previousMillis = currentMillis;  // Armazena o tempo atual novamente
+        saidaAtiva = false;              // Desativa o estado de "saída"
+        entradaAtiva = true;             // Ativa o estado de "entrada"
       }
 
-      // Se placa for 0, imprime "ande" normalmente, desde que não esteja no estado de parada
-      if (Placa == 0 && !parou) {
-        analogWrite(MOTOR_1R, speed);
+      // Mantém "entrada" por 6 segundos após "saída"
+      if (entradaAtiva && (currentMillis - previousMillis >= 6000)) {
+        entradaAtiva = false;  // Reseta os estados após 6 segundos de "entrada"
       }
+
+      // Se valor for 0, imprime "entrada" continuamente
+      if (Placa == 0) {
+        analogWrite(MOTOR_1R, speed);
+        saidaAtiva = false;
+        entradaAtiva = false;
+      }
+
+      
       
       //Acende os leds frontais
       int ligadoF = enviarArray[1].toInt();
