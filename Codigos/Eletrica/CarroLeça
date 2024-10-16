@@ -13,7 +13,7 @@ DIREITA  = 0
 ESQUERDA = 1
 AMBOS = 2
 RETO = 3
-PARAR = 0
+
 
 DISTANCIA_CENTRO_FAIXA = 170 # distancia centro do veiculo / camera até a faixa, para controle
 KP = 0.3
@@ -33,12 +33,12 @@ AREA_INT_FIM = 220
 
 #Valor da Webcam
 CameraFaixa = 0
-CameraPlaca = 0
+CameraPlaca = 1
 
 # constantes de envio de informaçoes por serial
 ENVIAR_DADOS = False    # enviar dados para o arduino
 TEMPO_ENVIO  = 0.1      # tempo em segundos
-PORTA_COM    = 'COM7'  # porta COM para comunicar com Arduino
+PORTA_COM    = 'COM8'  # porta COM para comunicar com Arduino
 porta_serial = None
 
 # vetor para envio de dados para o Arduino -> 8 bytes
@@ -212,7 +212,6 @@ FOCAL_LENGTH = 600  # Valor hipotético, precisa ser ajustado dependendo da câm
 # Carregar o modelo YOLOv8 personalizado (.pt) com o logging desativado
 model = YOLO("C:/Users/limao/Área de Trabalho/Arquivos dos aplicativos/PYTHON/yolov8n.pt")  # Substitua pelo caminho do seu arquivo .pt
 
-
 # Desativar os logs do YOLOv8
 model.overrides['verbose'] = False  # Desativa mensagens do modelo
 
@@ -242,7 +241,7 @@ line_end = (500, 300)    # Ponto final da linha
 cap = cv.VideoCapture(CameraFaixa, cv2.CAP_DSHOW)
 cap2 = cv2.VideoCapture(CameraPlaca, cv2.CAP_DSHOW)
 
-while cap.isOpened() and cap2.isOpened():
+while(1):
 # ------------------------------CODIGO 2---------------------------------------------------------------------
     ret2, frame2 = cap2.read()
 
@@ -251,6 +250,10 @@ while cap.isOpened() and cap2.isOpened():
 
     # Realizar a detecção usando o modelo YOLOv8
     results = model(frame2)
+
+    ParaPlaca = 0
+    ParaPessoa = 0
+    ParaSemaforo = 0
 
     for result in results:
         boxes = result.boxes
@@ -286,23 +289,20 @@ while cap.isOpened() and cap2.isOpened():
                         light_status = "Unknown light"
                     cv2.putText(frame2, light_status, (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
                     if light_status == "Red light" and distance < 2:
-                        PARAR = 1
+                        ParaSemaforo = 1
 
                 # Verificar se uma pessoa está abaixo da linha e a menos de 2 metros
                 if label == "person" and distance < 2:
                     person_center_x = (x1 + x2) // 2
                     person_center_y = y2  # Considerando a parte inferior da pessoa
                     if is_below_line(*line_start, *line_end, person_center_x, person_center_y):
-                        PARAR = 1
+                        ParaPessoa = 1
 
 
                 # Verificar se uma placa de pare está a menos de 2 metros
                 if label == "stop sign" and distance < 2:
-                    PARAR = 1
+                    ParaPlaca = 1
 
-
-
-    # Exibir a imagem
     cv2.imshow("Image", frame2)
 # ------------------------------CODIGO 1--------------------------------------------------------------------
     # pegar frame do video / camera
@@ -384,12 +384,12 @@ while cap.isOpened() and cap2.isOpened():
     enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')   # VELOCIDADE
     enviar_dados[1] = 150                                                               # FAROL_FRONTAL
 
-    if pare == 0:
+    #if pare == 0:
         # O CARRO VAI CONTINUAR NORMAL
-        enviar_dados[4] = 0
-    else:
+     #   enviar_dados[4] = 0
+    #else:
         # O CARRO VAI PARAR
-        enviar_dados[4] = 1
+     #   enviar_dados[4] = 1
 
     if Lado == 0:
         enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')  # VELOCIDADE
@@ -421,7 +421,11 @@ while cap.isOpened() and cap2.isOpened():
 
     #enviar_dados[6] = faixaDireita  #valor da faixa da direita
     #enviar_dados[7] = faixaEsquerda #valor da faixa da esquerda
-    enviar_dados[7] = PARAR
+    enviar_dados[7] = ParaSemaforo
+    enviar_dados[6] = ParaPlaca
+    enviar_dados[8] = ParaPessoa
+
+
 
 
 
