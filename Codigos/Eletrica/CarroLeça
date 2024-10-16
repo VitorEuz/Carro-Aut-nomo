@@ -15,7 +15,7 @@ AMBOS = 2
 RETO = 3
 
 
-DISTANCIA_CENTRO_FAIXA = 170 # distancia centro do veiculo / camera até a faixa, para controle
+DISTANCIA_CENTRO_FAIXA = 150 # distancia centro do veiculo / camera até a faixa, para controle
 KP = 0.3
 KI = 0.005
 KD = 0.05
@@ -33,10 +33,10 @@ AREA_INT_FIM = 220
 
 #Valor da Webcam
 CameraFaixa = 0
-CameraPlaca = 1
+CameraPlaca = 2
 
 # constantes de envio de informaçoes por serial
-ENVIAR_DADOS = False    # enviar dados para o arduino
+ENVIAR_DADOS = True    # enviar dados para o arduino
 TEMPO_ENVIO  = 0.1      # tempo em segundos
 PORTA_COM    = 'COM8'  # porta COM para comunicar com Arduino
 porta_serial = None
@@ -221,7 +221,7 @@ cv.namedWindow('Controles')
 # Cria as trackbars (sliders) para controle de Hue, Saturation e Value
 cv.createTrackbar('canny_1', 'Controles', 200, 300, nothing)
 cv.createTrackbar('canny_2', 'Controles', 220, 400, nothing)
-cv.createTrackbar('velocidade', 'Controles', 0, 255, nothing)
+cv.createTrackbar('velocidade', 'Controles', 78, 255, nothing)
 cv.createTrackbar('Lado','Controles',2,3,nothing)
 cv.createTrackbar('pare','Controles',0,1,nothing)
 
@@ -235,8 +235,8 @@ fontCor = (0, 0, 255)  # BGR
 fontThickness = 1
 
 # Definir os pontos da linha vermelha (pode ajustar conforme necessário)
-line_start = (100, 300)  # Ponto inicial da linha
-line_end = (500, 300)    # Ponto final da linha
+line_start = (50, 400)  # Ponto inicial da linha
+line_end = (380, 400)    # Ponto final da linha
 
 cap = cv.VideoCapture(CameraFaixa, cv2.CAP_DSHOW)
 cap2 = cv2.VideoCapture(CameraPlaca, cv2.CAP_DSHOW)
@@ -254,6 +254,7 @@ while(1):
     ParaPlaca = 0
     ParaPessoa = 0
     ParaSemaforo = 0
+    PARAR = 0
 
     for result in results:
         boxes = result.boxes
@@ -300,7 +301,7 @@ while(1):
 
 
                 # Verificar se uma placa de pare está a menos de 2 metros
-                if label == "stop sign" and distance < 2:
+                if label == "stop sign" and distance < 3.8:
                     ParaPlaca = 1
 
     cv2.imshow("Image", frame2)
@@ -421,9 +422,10 @@ while(1):
 
     #enviar_dados[6] = faixaDireita  #valor da faixa da direita
     #enviar_dados[7] = faixaEsquerda #valor da faixa da esquerda
-    enviar_dados[7] = ParaSemaforo
-    enviar_dados[6] = ParaPlaca
-    enviar_dados[8] = ParaPessoa
+    enviar_dados[5] = ParaPlaca
+    enviar_dados[6] = ParaSemaforo
+    enviar_dados[7] = ParaPessoa
+
 
 
 
