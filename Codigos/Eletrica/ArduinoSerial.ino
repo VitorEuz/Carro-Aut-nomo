@@ -35,8 +35,10 @@ bool estadoEsquerdo = false;
 int ladocerto = 5;
 int controlePare = 0;
 
-unsigned long lastTime = 0;
-bool parou = false;
+unsigned long tempo_inicial = 0;  // Guarda o tempo inicial
+int estadoMotor = 0;  // 0 = motor parado, 1 = motor andando
+const long intervalo_parada = 5000;  // Intervalo de 2 segundos parado
+const long intervalo_andar = 6000;   // Intervalo de 6 segundos andando
 
 
 void setup() {
@@ -114,49 +116,38 @@ void loop() {
       int Placa = enviarArray[5].toInt();
       int Semaforo = enviarArray[6].toInt();
       int Pessoa = enviarArray[7].toInt();
-
-      unsigned long previousMillis = 0;  // Armazena o tempo anterior
-      bool saidaAtiva = false;
-      bool entradaAtiva = false;
       
-      /*
+      
       if (Placa == 1 || Semaforo == 1 || Pessoa == 1) {
         analogWrite(MOTOR_1R, 0);
       } else {
         analogWrite(MOTOR_1R, speed);}
-        */
+        
+      /*
+      unsigned long tempo_atual = millis();  // Pega o tempo atual
 
-      unsigned long currentMillis = millis();  // Pega o tempo atual
 
-      if (Placa == 1 && !saidaAtiva && !entradaAtiva) {
-        // Quando o valor é 1 e não está no estado de "saída" ou "entrada"
+      if (Placa == 1) {
+        if (estadoMotor == 0 && tempo_atual - tempo_inicial >= intervalo_parada) {
+          // O motor estava parado por 2 segundos, agora começa a andar
+          analogWrite(MOTOR_1R, speed);
+          estadoMotor = 1;  // Atualiza o estado do motor
+          tempo_inicial = tempo_atual;  // Reseta o tempo inicial
+        } 
+        else if (estadoMotor == 1 && tempo_atual - tempo_inicial >= intervalo_andar) {
+          // O motor andou por 6 segundos, agora para
+          analogWrite(MOTOR_1R, 0);
+          estadoMotor = 0;  // Atualiza o estado do motor
+          tempo_inicial = tempo_atual;  // Reseta o tempo inicial
+        }
+      }
+      else if (Placa == 0) {
+        if (Semaforo == 1 || Pessoa == 1) {
         analogWrite(MOTOR_1R, 0);
-        previousMillis = currentMillis;  // Armazena o tempo atual
-        saidaAtiva = true;               // Ativa o estado de "saída"
+      } else {
+        analogWrite(MOTOR_1R, speed);}
       }
-
-      // Mantém "saída" por 5 segundos
-      if (saidaAtiva && (currentMillis - previousMillis >= 5000)) {
-        analogWrite(MOTOR_1R, speed);       // Após 5 segundos, imprime "entrada"
-        previousMillis = currentMillis;  // Armazena o tempo atual novamente
-        saidaAtiva = false;              // Desativa o estado de "saída"
-        entradaAtiva = true;             // Ativa o estado de "entrada"
-      }
-
-      // Mantém "entrada" por 6 segundos após "saída"
-      if (entradaAtiva && (currentMillis - previousMillis >= 6000)) {
-        entradaAtiva = false;  // Reseta os estados após 6 segundos de "entrada"
-      }
-
-      // Se valor for 0, imprime "entrada" continuamente
-      if (Placa == 0) {
-        analogWrite(MOTOR_1R, speed);
-        saidaAtiva = false;
-        entradaAtiva = false;
-      }
-
-      
-      
+      */
       //Acende os leds frontais
       int ligadoF = enviarArray[1].toInt();
       analogWrite(FarolFrontal, ligadoF);
