@@ -33,12 +33,10 @@ bool estadoDireito = false;
 bool estadoEsquerdo = false;
 
 int ladocerto = 5;
-int controlePare = 0;
 
-unsigned long tempo_inicial = 0;  // Guarda o tempo inicial
-int estadoMotor = 0;  // 0 = motor parado, 1 = motor andando
-const long intervalo_parada = 5000;  // Intervalo de 2 segundos parado
-const long intervalo_andar = 6000;   // Intervalo de 6 segundos andando
+unsigned long previousMillis = 0;
+unsigned long interval = 0;
+bool motorState = LOW; 
 
 
 void setup() {
@@ -62,6 +60,7 @@ void setup() {
 }
 
 void loop() {
+  unsigned long currentMillis = millis();
 
   if (digitalRead(botaoDireito) == LOW) {
     if (!estadoDireito) {
@@ -80,7 +79,6 @@ void loop() {
       estadoDireito = false;
     }
   }
-
   // Verifica se há dados disponíveis na comunicação serial
   if (Serial.available() > 0) {
     // Lê a string até encontrar o caractere '#'
@@ -105,49 +103,41 @@ void loop() {
           enviarIndex++;       // Incrementa o índice do array
         }
       }
-
-      /*
-      // CONTROLE DE VELOCIDADE PARA FRENTE: utiliza o segundo valor (posição 1 do array)
-      int speed = enviarArray[0].toInt();
-      analogWrite(MOTOR_1R, speed);
-      */
-
       int speed = enviarArray[0].toInt();
       int Placa = enviarArray[5].toInt();
       int Semaforo = enviarArray[6].toInt();
       int Pessoa = enviarArray[7].toInt();
-      
-      
-      if (Placa == 1 || Semaforo == 1 || Pessoa == 1) {
-        analogWrite(MOTOR_1R, 0);
-      } else {
-        analogWrite(MOTOR_1R, speed);}
-        
-      /*
-      unsigned long tempo_atual = millis();  // Pega o tempo atual
 
-
-      if (Placa == 1) {
-        if (estadoMotor == 0 && tempo_atual - tempo_inicial >= intervalo_parada) {
-          // O motor estava parado por 2 segundos, agora começa a andar
-          analogWrite(MOTOR_1R, speed);
-          estadoMotor = 1;  // Atualiza o estado do motor
-          tempo_inicial = tempo_atual;  // Reseta o tempo inicial
-        } 
-        else if (estadoMotor == 1 && tempo_atual - tempo_inicial >= intervalo_andar) {
-          // O motor andou por 6 segundos, agora para
-          analogWrite(MOTOR_1R, 0);
-          estadoMotor = 0;  // Atualiza o estado do motor
-          tempo_inicial = tempo_atual;  // Reseta o tempo inicial
+      // Verifica se Pessoa ou Semaforo estão iguais a 1
+      if (Pessoa == 1 || Semaforo == 1) {
+        // Se qualquer um dos dois for igual a 1, o motor para imediatamente
+        analogWrite(MOTOR_1R, 0);  // Para o motor
+        motorState = LOW;          // Define o estado como desligado
+      }
+      // Caso contrário, se Placa for 1, usa a lógica de millis para controle de tempo
+      else if (Placa == 1) {
+        if (motorState == LOW && (currentMillis - previousMillis >= interval)) {
+          // Para o motor por 2 segundos
+          analogWrite(MOTOR_1R, 0);      // Desliga o motor (0 = parado)
+          motorState = HIGH;             // Define o estado do motor como parado
+          interval = 2000;               // Define o intervalo de 2 segundos
+          previousMillis = currentMillis; // Atualiza o tempo de referência
+        }
+        else if (motorState == HIGH && (currentMillis - previousMillis >= interval)) {
+          // Após 2 segundos, liga o motor por 5 segundos
+          analogWrite(MOTOR_1R, speed); // Liga o motor na velocidade máxima (255 = 100%)
+          interval = 5000;                   // Define o intervalo de 5 segundos
+          previousMillis = currentMillis;    // Atualiza o tempo de referência
+          motorState = LOW;                  // Define o motor como ligado
         }
       }
-      else if (Placa == 0) {
-        if (Semaforo == 1 || Pessoa == 1) {
-        analogWrite(MOTOR_1R, 0);
-      } else {
-        analogWrite(MOTOR_1R, speed);}
+      else if (Placa == 0 && Pessoa == 0 && Semaforo == 0) {
+        // Se todos os valores forem 0, liga o motor normalmente
+        analogWrite(MOTOR_1R, speed); // Liga o motor normalmente
+        motorState = LOW;  // Define o motor como ligado
+        interval = 0;      // Reseta o intervalo para reiniciar o ciclo
       }
-      */
+      
       //Acende os leds frontais
       int ligadoF = enviarArray[1].toInt();
       analogWrite(FarolFrontal, ligadoF);
@@ -155,7 +145,9 @@ void loop() {
       if (ladocerto == 0){
        servo_direcao.write(enviarArray[2].toInt()); 
       }else {
-        servo_direcao.write(enviarArray[3].toInt());}     
+        servo_direcao.write(enviarArray[3].toInt());}
+
+
     } 
   }
 }
