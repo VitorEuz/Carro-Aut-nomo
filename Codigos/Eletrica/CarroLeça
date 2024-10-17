@@ -8,14 +8,23 @@ import time
 from ultralytics import YOLO
 
 
-
 DIREITA  = 0
 ESQUERDA = 1
 AMBOS = 2
 RETO = 3
 
+SetPoint_DIREITA = 170
+SetPoint_ESQUERDA = 170
 
-DISTANCIA_CENTRO_FAIXA = 170 # distancia centro do veiculo / camera até a faixa, para controle
+#Valor da Webcam
+CameraFaixa = 0
+CameraPlaca = 0
+
+# constantes de envio de informaçoes por serial
+ENVIAR_DADOS = False    # enviar dados para o arduino
+TEMPO_ENVIO  = 0.1      # tempo em segundos
+PORTA_COM    = 'COM8'  # porta COM para comunicar com Arduino
+porta_serial = None
 
 KP = 0.3
 KI = 0.005
@@ -31,16 +40,6 @@ print("Redimensionado: ", FRAME_WIDTH, "x", FRAME_HEIGHT)
 # capura da area de interesse
 AREA_INT_INICIO = 200
 AREA_INT_FIM = 220
-
-#Valor da Webcam
-CameraFaixa = 0
-CameraPlaca = 2
-
-# constantes de envio de informaçoes por serial
-ENVIAR_DADOS = True    # enviar dados para o arduino
-TEMPO_ENVIO  = 0.1      # tempo em segundos
-PORTA_COM    = 'COM8'  # porta COM para comunicar com Arduino
-porta_serial = None
 
 # vetor para envio de dados para o Arduino -> 8 bytes
 # posiçao 0 -> velocidade do carro: 0~255
@@ -224,10 +223,10 @@ cv.createTrackbar('canny_1', 'Controles', 200, 300, nothing)
 cv.createTrackbar('canny_2', 'Controles', 220, 400, nothing)
 cv.createTrackbar('velocidade', 'Controles', 78, 255, nothing)
 cv.createTrackbar('Lado','Controles',2,3,nothing)
-cv.createTrackbar('pare','Controles',0,1,nothing)
 
 # Inicializa o controlador PID com ganhos KP, KI, KD
-pid_direcao = pid_direcao(DISTANCIA_CENTRO_FAIXA, KP, KI, KD, MIN, MAX)
+pid_direcao_DIREITA = pid_direcao(SetPoint_DIREITA, KP, KI, KD, MIN, MAX)
+pid_direcao_ESQUERDA = pid_direcao(SetPoint_ESQUERDA, KP, KI, KD, MIN, MAX)
 
 # config. de saida de texto -> Plota na tela o texto
 font = cv.FONT_HERSHEY_SIMPLEX
@@ -243,9 +242,17 @@ cap = cv.VideoCapture(CameraFaixa, cv2.CAP_DSHOW)
 cap2 = cv2.VideoCapture(CameraPlaca, cv2.CAP_DSHOW)
 
 while(1):
-# ------------------------------CODIGO 2---------------------------------------------------------------------
+    # pegar frame do video / camera
+    ret, frame = cap.read()
     ret2, frame2 = cap2.read()
 
+    # se nao tiver imagem fecha a aplicacao
+    if not ret and ret2:
+        print("entrada cap nao detectado!")
+        # fechar programa jumto com as conexoes
+        fecharAplicativo()
+
+# ------------------------------CODIGO 2---------------------------------------------------------------------
     # Desenhar a linha vermelha na imagem
     cv2.line(frame2, line_start, line_end, (0, 0, 255), 2)
 
@@ -255,7 +262,6 @@ while(1):
     ParaPlaca = 0
     ParaPessoa = 0
     ParaSemaforo = 0
-    PARAR = 0
 
     for result in results:
         boxes = result.boxes
@@ -300,21 +306,11 @@ while(1):
                     if is_below_line(*line_start, *line_end, person_center_x, person_center_y):
                         ParaPessoa = 1
 
-
                 # Verificar se uma placa de pare está a menos de 2 metros
                 if label == "stop sign" and distance < 3.8:
                     ParaPlaca = 1
 
-    cv2.imshow("Image", frame2)
 # ------------------------------CODIGO 1--------------------------------------------------------------------
-    # pegar frame do video / camera
-    ret, frame = cap.read()
-
-    # se nao tiver imagem fecha a aplicacao
-    if not ret:
-        print("entrada cap nao detectado!")
-        # fechar programa jumto com as conexoes
-        fecharAplicativo()
 
     # ajustar o tamanho do video, quanto menor mais rapido o processamento
     frame = cv.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT))
@@ -369,49 +365,38 @@ while(1):
             (0, 255, 255), 2)
 
     # saidas das imagens processadas
-    cv.imshow("Saida de Videos", frame)
+    cv.imshow("Saida Faixa", frame)
+    cv2.imshow("Saida Pessoa", frame2)
     cv.imshow("Saida Filtro", imgFiltro)
     cv.imshow("Area de Intersse", area_interesse)
 
     # Captura o valor atual da trackbar 'Lado'
     Lado = cv.getTrackbarPos('Lado', 'Controles')
 
-    pare = cv.getTrackbarPos('pare', 'Controles')
-
-    # Define qual faixa deve ser analisada com base no valor da trackbar
-
-
 #----------------------------------------------------------------------------------------------------------------------
 
     enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')   # VELOCIDADE
     enviar_dados[1] = 150                                                               # FAROL_FRONTAL
 
-    #if pare == 0:
-        # O CARRO VAI CONTINUAR NORMAL
-     #   enviar_dados[4] = 0
-    #else:
-        # O CARRO VAI PARAR
-     #   enviar_dados[4] = 1
-
     if Lado == 0:
         enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')  # VELOCIDADE
-        # Controlar o veiculo pela lado direito
+        # Controlar o veículo pelo lado direito
         if not math.isinf(media_direita):
-            enviar_dados[2] = round(pid_direcao.calcularSaida(media_direita))
+            enviar_dados[2] = round(pid_direcao_DIREITA.calcularSaida(media_direita))
             enviar_dados[2] = (enviar_dados[2] * -1) + 85
     elif Lado == 1:
         enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')  # VELOCIDADE
         # Controlar o veiculo pela lado esquerdo
         if not math.isinf(media_esquerda):
-            enviar_dados[3] = round(pid_direcao.calcularSaida(media_esquerda))
+            enviar_dados[3] = round(pid_direcao_ESQUERDA.calcularSaida(media_esquerda))
             enviar_dados[3] = enviar_dados[3] + 85
     elif Lado == 2:
         enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')  # VELOCIDADE
         if not math.isinf(media_direita):
-            enviar_dados[2] = round(pid_direcao.calcularSaida(media_direita))
+            enviar_dados[2] = round(pid_direcao_DIREITA.calcularSaida(media_direita))
             enviar_dados[2] = (enviar_dados[2] * -1) + 85
         if not math.isinf(media_esquerda):
-            enviar_dados[3] = round(pid_direcao.calcularSaida(media_esquerda))
+            enviar_dados[3] = round(pid_direcao_ESQUERDA.calcularSaida(media_esquerda))
             enviar_dados[3] = enviar_dados[3] + 85
     else:
         enviar_dados[0] = cv.getTrackbarPos('velocidade', 'Controles')  # VELOCIDADE
@@ -420,28 +405,17 @@ while(1):
         if not math.isinf(media_esquerda):
             enviar_dados[3] = 90
 
-
-    #enviar_dados[6] = faixaDireita  #valor da faixa da direita
-    #enviar_dados[7] = faixaEsquerda #valor da faixa da esquerda
     enviar_dados[5] = ParaPlaca
     enviar_dados[6] = ParaSemaforo
     enviar_dados[7] = ParaPessoa
-
-
-
-
-
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 
     # chama a funcao para enviar tudo por serial para o arduino
     enviar_dados_serial()
-    # verificar tecla para fechar o programa
     if cv2.waitKey(1) == 27:  # 27 é o código ASCII para a tecla ESC
         break
-
-
 
 # fechar programa jumto com as conexoes
 fecharAplicativo()
