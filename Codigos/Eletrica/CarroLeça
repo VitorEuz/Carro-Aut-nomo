@@ -15,7 +15,8 @@ AMBOS = 2
 RETO = 3
 
 
-DISTANCIA_CENTRO_FAIXA = 150 # distancia centro do veiculo / camera até a faixa, para controle
+DISTANCIA_CENTRO_FAIXA = 170 # distancia centro do veiculo / camera até a faixa, para controle
+
 KP = 0.3
 KI = 0.005
 KD = 0.05
@@ -235,8 +236,8 @@ fontCor = (0, 0, 255)  # BGR
 fontThickness = 1
 
 # Definir os pontos da linha vermelha (pode ajustar conforme necessário)
-line_start = (50, 400)  # Ponto inicial da linha
-line_end = (380, 400)    # Ponto final da linha
+line_start = (100, 450)  # Ponto inicial da linha
+line_end = (400, 450)    # Ponto final da linha
 
 cap = cv.VideoCapture(CameraFaixa, cv2.CAP_DSHOW)
 cap2 = cv2.VideoCapture(CameraPlaca, cv2.CAP_DSHOW)
