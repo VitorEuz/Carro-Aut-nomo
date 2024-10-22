@@ -1,3 +1,5 @@
+
+
 /*
 PonteH = 5 PWM
 Servo = 3 PWM
@@ -5,9 +7,16 @@ FarolFrontal = 6 PWM
 
 LedIndicadorDireito = 7
 LedIndicadorEsquerdo = 4
+LedTrasieors = 8
 
 BotãoDireto = A5
 BotãoEsquerdo = A4
+
+ultra1_tri = 9
+ultra1_ech = 10
+
+ultra2_tri = 11
+ultra2_ech = 12
 
 Array[0] = MOTOR
 Array[1] = Farol Frontal
@@ -16,6 +25,8 @@ Array[3] = SERVO ESQUERDO
 */
 
 #include <Servo.h>
+#include <Ultrasonic.h>
+
 
 Servo servo_direcao;
 
@@ -28,9 +39,18 @@ const int botaoDireito = A5;
 const int botaoEsquerdo = A4; 
 const byte LedIndicadorDireito = 7;
 const byte LedIndicadorEsquerdo = 4;
+const byte LedTrasieors = 8;
 
 bool estadoDireito = false;
 bool estadoEsquerdo = false;
+
+const int ultra1_tri = 9;
+const int ultra1_ech = 10;
+Ultrasonic sensor1(ultra1_tri,ultra1_ech);
+const int ultra2_tri = 11;
+const int ultra2_ech = 12;
+Ultrasonic sensor2(ultra2_tri,ultra2_ech);
+
 
 int ladocerto = 5;
 
@@ -54,6 +74,12 @@ void setup() {
 
   digitalWrite(LedIndicadorDireito, HIGH); 
   digitalWrite(LedIndicadorEsquerdo, HIGH);
+
+  analogWrite(LedTrasieors, 0);
+  delay(500);
+  analogWrite(LedTrasieors, 150);
+  delay(500);
+  analogWrite(LedTrasieors, 0);
 
   Serial.begin(9600);
   delay(500);
@@ -107,11 +133,12 @@ void loop() {
       int Placa = enviarArray[5].toInt();
       int Semaforo = enviarArray[6].toInt();
       int Pessoa = enviarArray[7].toInt();
-
+      
       // Verifica se Pessoa ou Semaforo estão iguais a 1
       if (Pessoa == 1 || Semaforo == 1) {
         // Se qualquer um dos dois for igual a 1, o motor para imediatamente
         analogWrite(MOTOR_1R, 0);  // Para o motor
+        analogWrite(LedTrasieors, 150);
         motorState = LOW;          // Define o estado como desligado
       }
       // Caso contrário, se Placa for 1, usa a lógica de millis para controle de tempo
@@ -119,6 +146,7 @@ void loop() {
         if (motorState == LOW && (currentMillis - previousMillis >= interval)) {
           // Para o motor por 2 segundos
           analogWrite(MOTOR_1R, 0);      // Desliga o motor (0 = parado)
+          analogWrite(LedTrasieors, 150);
           motorState = HIGH;             // Define o estado do motor como parado
           interval = 2000;               // Define o intervalo de 2 segundos
           previousMillis = currentMillis; // Atualiza o tempo de referência
@@ -126,6 +154,7 @@ void loop() {
         else if (motorState == HIGH && (currentMillis - previousMillis >= interval)) {
           // Após 2 segundos, liga o motor por 5 segundos
           analogWrite(MOTOR_1R, speed); // Liga o motor na velocidade máxima (255 = 100%)
+          analogWrite(LedTrasieors, 0);
           interval = 5000;                   // Define o intervalo de 5 segundos
           previousMillis = currentMillis;    // Atualiza o tempo de referência
           motorState = LOW;                  // Define o motor como ligado
@@ -134,6 +163,7 @@ void loop() {
       else if (Placa == 0 && Pessoa == 0 && Semaforo == 0) {
         // Se todos os valores forem 0, liga o motor normalmente
         analogWrite(MOTOR_1R, speed); // Liga o motor normalmente
+        analogWrite(LedTrasieors, 0);
         motorState = LOW;  // Define o motor como ligado
         interval = 0;      // Reseta o intervalo para reiniciar o ciclo
       }
