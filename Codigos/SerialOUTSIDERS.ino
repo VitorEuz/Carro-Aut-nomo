@@ -12,8 +12,8 @@ LedTrasieors = 8
 BotãoDireto = A5
 BotãoEsquerdo = A4
 
-ultra1_tri = 9
-ultra1_ech = 10
+ultra1_tri = 9 marro 
+ultra1_ech = 10 roxo
 
 ultra2_tri = 11
 ultra2_ech = 12
@@ -25,7 +25,7 @@ Array[3] = SERVO ESQUERDO
 */
 
 #include <Servo.h>
-#include <Ultrasonic.h>
+#include <NewPing.h>
 
 
 Servo servo_direcao;
@@ -44,12 +44,13 @@ const byte LedTrasieors = 8;
 bool estadoDireito = false;
 bool estadoEsquerdo = false;
 
+#define MAX_DISTANCE 20
 const int ultra1_tri = 9;
 const int ultra1_ech = 10;
-Ultrasonic sensor1(ultra1_tri,ultra1_ech);
+NewPing sonar(ultra1_tri, ultra1_ech, MAX_DISTANCE);
 const int ultra2_tri = 11;
 const int ultra2_ech = 12;
-Ultrasonic sensor2(ultra2_tri,ultra2_ech);
+
 
 
 int ladocerto = 5;
@@ -129,6 +130,12 @@ void loop() {
           enviarIndex++;       // Incrementa o índice do array
         }
       }
+
+      if (ladocerto == 0){
+       servo_direcao.write(enviarArray[2].toInt()); 
+      }else {
+        servo_direcao.write(enviarArray[3].toInt());}
+
       int speed = enviarArray[0].toInt();
       int Placa = enviarArray[5].toInt();
       int Semaforo = enviarArray[6].toInt();
@@ -171,11 +178,6 @@ void loop() {
       //Acende os leds frontais
       int ligadoF = enviarArray[1].toInt();
       analogWrite(FarolFrontal, ligadoF);
-
-      if (ladocerto == 0){
-       servo_direcao.write(enviarArray[2].toInt()); 
-      }else {
-        servo_direcao.write(enviarArray[3].toInt());}
 
 
     } 
