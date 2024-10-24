@@ -47,9 +47,12 @@ bool estadoEsquerdo = false;
 #define MAX_DISTANCE 20
 const int ultra1_tri = 9;
 const int ultra1_ech = 10;
-NewPing sonar(ultra1_tri, ultra1_ech, MAX_DISTANCE);
+NewPing sonar1(ultra1_tri, ultra1_ech, MAX_DISTANCE);
 const int ultra2_tri = 11;
 const int ultra2_ech = 12;
+NewPing sonar2(ultra2_tri, ultra2_ech, MAX_DISTANCE);
+
+int pararVelo = 25;
 
 
 
@@ -130,21 +133,22 @@ void loop() {
           enviarIndex++;       // Incrementa o índice do array
         }
       }
+      int speed = enviarArray[0].toInt();
+      int Placa = enviarArray[5].toInt();
+      int Semaforo = enviarArray[6].toInt();
+      int Pessoa = enviarArray[7].toInt();
+      int distance1 = sonar1.ping_cm();
+      int distance2 = sonar2.ping_cm();
 
       if (ladocerto == 0){
        servo_direcao.write(enviarArray[2].toInt()); 
       }else {
         servo_direcao.write(enviarArray[3].toInt());}
-
-      int speed = enviarArray[0].toInt();
-      int Placa = enviarArray[5].toInt();
-      int Semaforo = enviarArray[6].toInt();
-      int Pessoa = enviarArray[7].toInt();
       
       // Verifica se Pessoa ou Semaforo estão iguais a 1
-      if (Pessoa == 1 || Semaforo == 1) {
+      if (Pessoa == 1 || Semaforo == 1  || distance1 > 0 && distance1 <= 20  || distance2 > 0 && distance2 <= 20) {
         // Se qualquer um dos dois for igual a 1, o motor para imediatamente
-        analogWrite(MOTOR_1R, 0);  // Para o motor
+        analogWrite(MOTOR_1R, pararVelo);  // Para o motor
         analogWrite(LedTrasieors, 150);
         motorState = LOW;          // Define o estado como desligado
       }
@@ -152,7 +156,7 @@ void loop() {
       else if (Placa == 1) {
         if (motorState == LOW && (currentMillis - previousMillis >= interval)) {
           // Para o motor por 2 segundos
-          analogWrite(MOTOR_1R, 0);      // Desliga o motor (0 = parado)
+          analogWrite(MOTOR_1R, pararVelo);      // Desliga o motor (0 = parado)
           analogWrite(LedTrasieors, 150);
           motorState = HIGH;             // Define o estado do motor como parado
           interval = 2000;               // Define o intervalo de 2 segundos
